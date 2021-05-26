@@ -1,0 +1,43 @@
+/*
+ *in questo file realizzo le system call sys_read() e sys_write() per rendere eseguibile un processo user che effettui I/O
+Prototipi read e write:
+int read(int fd, void *buf, size_t nbytes) --> ritorna 0 in caso di EOF, -1 in caso di errore e il #di bytes letti in caso di successo
+int write(int fd, void *buf, size_t nbytes)
+*
+*
+
+ */
+#include <unistd.h>
+#include <stdio.h>
+#include <conio.h> /*qui dentro ci sono putch() e getch()*/
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <fcntl.h>
+
+int sys_write (int fd, void *buf, size_t nbytes) {
+  int nW = (int)nbytes; /*number of bytes written, the return value*/
+  int i;
+  /*il file descriptor è un intero che può assumere i valori 0 (standard input), 1 (standard output) e 2 (standard error)*/
+  char *string = (char *) buf;
+  /*per prima cosa devo verificare la correttezza dei parametri che passo*/
+  if (fd < 0 || fd > 2) {
+    fprintf(stderr, "fd is not a valid file descriptor.\n");
+    return EBADF;
+  }
+  for(i = 0; i < nbytes; i++){
+    putch(buf[i]);
+  }
+  return nW;
+  /*se fallisce ritorna -1, altrimenti ritorna il numero di byte correttamente scritti*/
+ 
+}
+
+int sys_read(int fd, void *buf, size_t nbytes) {
+  int nR = (int)nbytes);
+
+
+
+ return nR;
+}
