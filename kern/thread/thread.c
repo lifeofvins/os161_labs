@@ -1103,15 +1103,6 @@ wchan_isempty(struct wchan *wc, struct spinlock *lk)
 }
 
 
-/*LAB3*/
-
-void wchan_lock(struct wchan *wc) {
-	spinlock_acquire(&wc->wchan_spinlock);
-}
-void wchan_unlock(struct wchan *wc) {
-	spinlock_release(&wc->wchan_spinlock);
-}
-
 ////////////////////////////////////////////////////////////
 
 /*

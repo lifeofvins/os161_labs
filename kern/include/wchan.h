@@ -77,9 +77,4 @@ void wchan_wakeone(struct wchan *wc, struct spinlock *lk);
 void wchan_wakeall(struct wchan *wc, struct spinlock *lk);
 
 
-/*LAB3*/
-void wchan_lock(struct wchan *wc);
-void wchan_unlock(struct wchan *wc);
-
-
 #endif /* _WCHAN_H_ */

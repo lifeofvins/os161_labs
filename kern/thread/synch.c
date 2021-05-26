@@ -166,7 +166,7 @@ lock_create(const char *name)
                 return NULL;
         }
 
-	HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
+	//HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
 
         // add stuff here as needed
 
@@ -263,15 +263,23 @@ lock_create(const char *name)
                 return NULL;
         }
 
-	HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
-
         // add stuff here as needed
-        
+        /*LAB3*/
         /*inizializzo spinlock e wait channel*/
-        /*inizialmente il lock è unlocked*/
+
+        lock->lock_wchan = wchan_create(lock->lk_name);
+        if (lock->lock_wchan == NULL) {
+        	kfree(lock->lk_name);
+        	kfree(lock);
+        	return NULL;
+        }
+        
+                /*inizialmente il lock è unlocked*/
         lock->locked = false;	
+        /*inizializzo spinlock*/
+        
 	spinlock_init(&lock->lock_spinlock);
-	lock->lock_wchan = wchan_create(lock->lk_name);
+	
         
 
         return lock;
@@ -282,12 +290,14 @@ void
 lock_destroy(struct lock *lock)
 {
         KASSERT(lock != NULL);
+        KASSERT(lock->locked == false);
 
         // add stuff here as needed
         
         /*distruggo spinlock e wait channel*/
         spinlock_cleanup(&lock->lock_spinlock);
-        kfree(lock->thread_who_acquired);
+        wchan_destroy(lock->lock_wchan);
+        
         kfree(lock->lk_name);
                 
         kfree(lock);
@@ -301,10 +311,6 @@ lock_destroy(struct lock *lock)
 void
 lock_acquire(struct lock *lock)
 {
-	
-
-        
-        
 	/* Call this (atomically) before waiting for a lock */
 	//HANGMAN_WAIT(&curthread->t_hangman, &lock->lk_hangman);
 
@@ -331,12 +337,8 @@ lock_acquire(struct lock *lock)
                 just in case someone else is trying to
                 acquire the lock at the same time
             */
-            wchan_lock(lock->lock_wchan); //blocco il wait channel
-            /*dopo aver "bloccato" il wait channel rilascio lo spinlock del lock per poter andare in sleep*/
-	    spinlock_release(&lock->lock_spinlock);
 	    wchan_sleep(lock->lock_wchan, &lock->lock_spinlock);
-	    //When we wake up, get the spinlock again so we can properly set lock bit.
-            spinlock_acquire(&lock->lock_spinlock);
+
 	}
 	//Sanity Check - Make sure we're unlocked.
         KASSERT(lock->locked == false);
@@ -345,8 +347,6 @@ lock_acquire(struct lock *lock)
 	lock->thread_who_acquired = curthread;
         //Now, release the spinlock.
         spinlock_release(&lock->lock_spinlock);
-        
-	lock->thread_who_acquired = curthread;
 }
 
 
