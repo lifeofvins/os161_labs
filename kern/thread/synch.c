@@ -375,7 +375,7 @@ lock_release(struct lock *lock)
 	/*mi assicuro che il lock sia effettivamente bloccato*/
 	KASSERT (lock->locked == true);
 	/*mi assicuro che colui che rilascia il lock sia lo stesso che lo ha acquisito*/
-	KASSERT (curthread == lock->thread_who_acquired);
+	KASSERT (lock_do_i_hold(lock));
 	
 	/*sblocco il lock*/
 	lock->locked = false;
@@ -426,6 +426,15 @@ cv_create(const char *name)
 	}
 
 	// add stuff here as needed
+	/*LAB3: creo wchan e lock associati alla cv*/
+	cv->cv_wchan = wchan_create(cv->cv_name);
+	if (cv->cv_wchan == NULL) {
+		kfree(cv->cv_wchan);
+		kfree(cv->cv_name);
+		return NULL;
+	}
+	
+	spinlock_init(&cv->cv_spinlock);
 
 	return cv;
 }
@@ -436,7 +445,9 @@ cv_destroy(struct cv *cv)
 	KASSERT(cv != NULL);
 
 	// add stuff here as needed
-
+	/*libero spinlock e wchan*/
+	kfree(cv->cv_wchan);
+	spinlock_clean(&cv->cv_spinlock);
 	kfree(cv->cv_name);
 	kfree(cv);
 }
@@ -445,8 +456,10 @@ void
 cv_wait(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	//(void)cv;    // suppress warning until code gets written
+	//(void)lock;  // suppress warning until code gets written
+	
+	/*LAB3: implemento cv_wait con wchan e spinlock*/
 }
 
 void

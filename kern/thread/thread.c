@@ -59,9 +59,6 @@
 struct wchan {
 	const char *wc_name;		/* name for this channel */
 	struct threadlist wc_threads;	/* list of waiting threads */
-	
-	/*LAB3: aggiungo spinlock per wchan_sleep*/
-	struct spinlock wchan_spinlock;
 };
 
 /* Master array of CPUs. */
