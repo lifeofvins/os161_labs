@@ -447,11 +447,12 @@ cv_destroy(struct cv *cv)
 	// add stuff here as needed
 	/*libero spinlock e wchan*/
 	kfree(cv->cv_wchan);
-	spinlock_clean(&cv->cv_spinlock);
+	spinlock_cleanup(&cv->cv_spinlock);
 	kfree(cv->cv_name);
 	kfree(cv);
 }
 
+/*OPERAZIONE ATOMICA: devo evitare che un altro thread acquisisca il lock prima che il thread vada in sleep*/
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
@@ -460,20 +461,50 @@ cv_wait(struct cv *cv, struct lock *lock)
 	//(void)lock;  // suppress warning until code gets written
 	
 	/*LAB3: implemento cv_wait con wchan e spinlock*/
+	/*schema: rilascio il lock, vado in sleep, riacquisisco il lock*/
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(curthread != NULL);
+	/*1: rilascio il lock acquisito*/
+	lock_release(lock);
+	
+	/*2: vado a dormire, ma prima devo acquisire lo spinlock*/
+	spinlock_acquire(&cv->cv_spinlock);
+	wchan_sleep(cv->cv_wchan, &cv->cv_spinlock);
+	spinlock_release(&cv->cv_spinlock);
+	/*3: prima di ritornare riacquisisco il lock*/
+	lock_acquire(lock);
 }
 
+/*operazione atomica*/
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	//(void)cv;    // suppress warning until code gets written
+	//(void)lock;  // suppress warning until code gets written
+	
+	/*LAB3: implemento cv_signal con wchan e spinlock*/
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(curthread != NULL);
+	spinlock_acquire(&cv->cv_spinlock);
+	wchan_wakeone(cv->cv_wchan, &cv->cv_spinlock);
+	spinlock_release(&cv->cv_spinlock);
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	//(void)cv;    // suppress warning until code gets written
+	//(void)lock;  // suppress warning until code gets written
+	
+	/*LAB3: implemento cv_broadcast con wchan e spinlock*/
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(curthread != NULL);
+	spinlock_acquire(&cv->cv_spinlock);
+	wchan_wakeall(cv->cv_wchan, &cv->cv_spinlock);
+	spinlock_release(&cv->cv_spinlock);
 }

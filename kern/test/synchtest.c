@@ -239,7 +239,7 @@ cvtestthread(void *junk, unsigned long num)
 	(void)junk;
 
 	for (i=0; i<NCVLOOPS; i++) {
-		lock_acquire(testlock);
+		lock_acquire(testlock); /*poi lo rilascio nella cv_wait*/
 		while (testval1 != num) {
 			gettime(&ts1);
 			cv_wait(testcv, testlock);
