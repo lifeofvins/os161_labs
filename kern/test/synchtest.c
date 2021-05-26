@@ -315,8 +315,8 @@ cvtest(int nargs, char **args)
  * thread won't go around enough times.
  */
 
-#define NCVS 250
-#define NLOOPS 40
+#define NCVS 250 //250
+#define NLOOPS 40 //40
 static struct cv *testcvs[NCVS];
 static struct lock *testlocks[NCVS];
 static struct semaphore *gatesem;

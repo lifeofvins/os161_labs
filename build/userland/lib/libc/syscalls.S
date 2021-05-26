@@ -82,7 +82,7 @@ sym:				; \
    .type __syscall,@function
    .ent __syscall
 __syscall:
-   syscall              /* make system call */
+   syscall              /* make system call: causa una software interruption */
    beq a3, $0, 1f       /* if a3 is zero, call succeeded */
    nop			/* delay slot */
    sw v0, errno        /* call failed: store errno */

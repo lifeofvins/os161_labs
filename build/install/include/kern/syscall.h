@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _KERN_SYSCALL_H_
+#ifndef _KERN_SYSCALL_H_ /*kernel support for system calls*/
 #define _KERN_SYSCALL_H_
 
 /*

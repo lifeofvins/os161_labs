@@ -37,7 +37,7 @@
 
 
 
-#if OPT_SYNCH
+
 /*
  * Header file for synchronization primitives.
  */
@@ -46,8 +46,9 @@
 #include <spinlock.h>
 
 /*LAB3*/
-#include <current.h> /*per salvarmi il thread corrente da usare nei lock implementati con semafori --> solo il thread che ha acquisito il lock può rilasciarlo*/
 
+
+#define LOCK_SEM 0
 /*
  * Dijkstra-style semaphore.
  *
@@ -92,17 +93,20 @@ struct lock {
         HANGMAN_LOCKABLE(lk_hangman);   /* Deadlock detector hook. */
         // add what you need here
         // (don't forget to mark things volatile as needed)
+#if OPT_SYNCH
         
         /*implemento il lock come un semaforo binario che rinforza la mutua esclusione --> solo chi ha acquisito il lock può rilasciarlo*/
+#if LOCK_SEM
 	struct semaphore *lock_sem;
-	struct thread *thread_who_acquired;
-	
+#else
 	/*implemento il lock con spinlock e wait channel*/
-
 	struct wchan *lock_wchan;
+
+#endif
 	struct spinlock lock_spinlock;
-	volatile bool locked; /*flag che mi dice se il lock è bloccato oppure no*/
-        
+
+	volatile struct thread *thread_who_acquired; /*Objects declared as volatile are omitted from optimization because their values can be changed by code outside the scope of current code at any time. The system always reads the current value of a volatile object from the memory location rather than keeping its value in temporary register at the point it is requested, even if a previous instruction asked for a value from the same object*/
+#endif  
 };
 
 struct lock *lock_create(const char *name);
@@ -144,8 +148,10 @@ struct cv {
         char *cv_name;
         // add what you need here
         // (don't forget to mark things volatile as needed)
+#if OPT_SYNCH
         struct wchan *cv_wchan;
         struct spinlock cv_spinlock;
+#endif
 };
 
 struct cv *cv_create(const char *name);
@@ -168,6 +174,5 @@ void cv_wait(struct cv *cv, struct lock *lock);
 void cv_signal(struct cv *cv, struct lock *lock);
 void cv_broadcast(struct cv *cv, struct lock *lock);
 
-#endif /*OPT_SYNCH*/
 #endif /* _SYNCH_H_ */
 

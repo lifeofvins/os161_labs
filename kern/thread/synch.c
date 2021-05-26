@@ -42,7 +42,6 @@
 
 
 #define SEM 0
-#define WCHAN 1
 ////////////////////////////////////////////////////////////
 //
 // Semaphore.
@@ -146,7 +145,6 @@ V(struct semaphore *sem)
 
 /*LAB3: devo completare/cambiare le funzioni lock_create(), lock_destroy(), lock_acquire(), lock_release(), lock_do_i_hold()*/
 /*************************************************SEMAFORO***************************/
-#if SEM
 struct lock *
 lock_create(const char *name)
 {
@@ -156,9 +154,6 @@ lock_create(const char *name)
         if (lock == NULL) {
                 return NULL;
         }
-	/*LAB3: creo il semaforo del lock (versione con semaforo)*/
-        lock->lock_sem = sem_create("lock_sem", 1);
-
 
         lock->lk_name = kstrdup(name);
         if (lock->lk_name == NULL) {
@@ -166,12 +161,26 @@ lock_create(const char *name)
                 return NULL;
         }
 
-	//HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
+
 
         // add stuff here as needed
-
-        
-
+#if OPT_SYNCH
+#if SEM
+	/*LAB3: creo il semaforo del lock (versione con semaforo)*/
+        lock->lock_sem = sem_create(lock->lk_name, 1);
+        if(lock->lock_sem == NULL) {
+#else
+	/*inizializzo spinlock e wait channel*/
+        lock->lock_wchan = wchan_create(lock->lk_name);
+        if (lock->lock_wchan == NULL) {
+#endif
+		kfree(lock->lk_name);
+		kfree(lock);
+		return NULL;
+	}  
+	lock->thread_who_acquired = NULL;
+	spinlock_init(&lock->lock_spinlock);
+#endif      
         return lock;
 }
 
@@ -181,12 +190,18 @@ lock_destroy(struct lock *lock)
         KASSERT(lock != NULL);
 
         // add stuff here as needed
-        
+#if OPT_SYNCH
         /*LAB3: distruggo anche il semaforo del lock e libero thread_who_acquired*/
+        spinlock_cleanup(&lock->lock_spinlock);
+#if SEM
         sem_destroy(lock->lock_sem);
-        kfree(lock->thread_who_acquired);
-        kfree(lock->lk_name);
-                
+#else
+        wchan_destroy(lock->lock_wchan);
+
+#endif
+#endif
+
+        kfree(lock->lk_name); 
         kfree(lock);
 
 }
@@ -195,197 +210,54 @@ lock_destroy(struct lock *lock)
 void
 lock_acquire(struct lock *lock)
 {
-	/* Call this (atomically) before waiting for a lock */
-	//HANGMAN_WAIT(&curthread->t_hangman, &lock->lk_hangman);
 
         // Write this
 
-        //(void)lock;  // suppress warning until code gets written
 
-	/* Call this (atomically) once the lock is acquired */
-	//HANGMAN_ACQUIRE(&curthread->t_hangman, &lock->lk_hangman);
-	
-	/*LAB3: implemento lock acquire utilizzando P(sem)*/
-
-	P(lock->lock_sem); //versione con semaforo
-	lock->thread_who_acquired = curthread;
-
-}
-
-void
-lock_release(struct lock *lock)
-{
-	/* Call this (atomically) when the lock is released */
-	//HANGMAN_RELEASE(&curthread->t_hangman, &lock->lk_hangman);
-
-        // Write this
-
-        //(void)lock;  // suppress warning until code gets written
-        /*LAB3: rilascio il semaforo solo se il thread è lo stesso che ha fatto lock_acquire*/
-        KASSERT(lock_do_i_hold(lock)); /*bloccati se non c'è ownership*/
-
-        V(lock->lock_sem); //versione con semaforo
-        
-}
-bool
-lock_do_i_hold(struct lock *lock)
-{
-/*funzione che ritorna vero se il thread possiede il lock*/
-        // Write this
-
-        //(void)lock;  // suppress warning until code gets written
-  struct thread *current_thread = curthread;
-  if (current_thread == lock->thread_who_acquired) {
-	return true; // dummy until code gets written
-  }
-  else {
-	return false;
-  }
-}
-#endif
-/*************************************************WCHAN E SPINLOCK***************************/
-#if WCHAN
-/*versione con wchan e spinlock*/
-struct lock *
-lock_create(const char *name)
-{
-  struct lock *lock;
-
-        lock = kmalloc(sizeof(*lock)); /*alloca la struct lock*/
-        if (lock == NULL) {
-                return NULL;
-        }
-	
-
-        lock->lk_name = kstrdup(name);
-        if (lock->lk_name == NULL) {
-                kfree(lock);
-                return NULL;
-        }
-
-        // add stuff here as needed
-        /*LAB3*/
-        /*inizializzo spinlock e wait channel*/
-
-        lock->lock_wchan = wchan_create(lock->lk_name);
-        if (lock->lock_wchan == NULL) {
-        	kfree(lock->lk_name);
-        	kfree(lock);
-        	return NULL;
-        }
-        
-                /*inizialmente il lock è unlocked*/
-        lock->locked = false;	
-        /*inizializzo spinlock*/
-        
-	spinlock_init(&lock->lock_spinlock);
-	
-        
-
-        return lock;
-}
-
-/*questa funzione non deve essere atomica*/
-void
-lock_destroy(struct lock *lock)
-{
-        KASSERT(lock != NULL);
-        KASSERT(lock->locked == false);
-
-        // add stuff here as needed
-        
-        /*distruggo spinlock e wait channel*/
-        spinlock_cleanup(&lock->lock_spinlock);
-        wchan_destroy(lock->lock_wchan);
-        
-        kfree(lock->lk_name);
-                
-        kfree(lock);
-
-}
-
-
-
-/*questa funzione deve essere atomica*/
-
-void
-lock_acquire(struct lock *lock)
-{
-	/* Call this (atomically) before waiting for a lock */
-	//HANGMAN_WAIT(&curthread->t_hangman, &lock->lk_hangman);
-
-        // Write this
-
-        //(void)lock;  // suppress warning until code gets written
-
-	/* Call this (atomically) once the lock is acquired */
-	//HANGMAN_ACQUIRE(&curthread->t_hangman, &lock->lk_hangman);
-	
-	
-		/*LAB3*/
+#if OPT_SYNCH
 	KASSERT(lock != NULL);
-	KASSERT(curthread != NULL);
-        //Ensure this operation is atomic
-        spinlock_acquire(&lock->lock_spinlock);
-        
-        /*come nella P dei semafori, anche qui abbiamo un ciclo while in cui mettiamo la wchan_sleep,
-        *solo che come condizione del while abbiamo lock->locked (flag) invece del contatore del semaforo*/
-        
-        while (lock->locked) {
-        	            /*
-                Lock the wait channel,
-                just in case someone else is trying to
-                acquire the lock at the same time
-            */
-	    wchan_sleep(lock->lock_wchan, &lock->lock_spinlock);
-
+	KASSERT(!(lock_do_i_hold(lock))); /*fermati se possiedo già il lock*/
+	KASSERT(curthread->t_in_interrupt == false); /*fermati se sono in interruzione*/
+	
+#if SEM	
+	/*LAB3: implemento lock acquire utilizzando P(sem)*/
+	P(lock->lock_sem); //versione con semaforo
+	/*siccome alla fine della P rilascio lo spinlock, lo riacquisisco subito dopo*/
+	spinlock_acquire(lock->lock_spinlock);
+#else
+	/*siccome per usare la wchan devo possedere lo spinlock, devo prima acquisirlo*/
+	spinlock_acquire(&lock->lock_spinlock);
+	while(lock->thread_who_acquired != NULL) { 
+		/*dormi finchè qualcuno non rilascia il lock*/
+		wchan_sleep(lock->lock_wchan, &lock->lock_spinlock);
 	}
-	//Sanity Check - Make sure we're unlocked.
-        KASSERT(lock->locked == false);
-        //Lock the lock!
-        lock->locked = true;
+#endif	
+	KASSERT(lock->thread_who_acquired == NULL); /*fermati se il thread che ha acquisito il lock non è null*/
 	lock->thread_who_acquired = curthread;
-        //Now, release the spinlock.
-        spinlock_release(&lock->lock_spinlock);
+	spinlock_release(&lock->lock_spinlock);
+#endif
+        (void)lock;  // suppress warning until code gets written
 }
 
-
-/*deve essere ATOMICA*/
 void
 lock_release(struct lock *lock)
 {
-
-	/* Call this (atomically) when the lock is released */
-	//HANGMAN_RELEASE(&curthread->t_hangman, &lock->lk_hangman);
-
         // Write this
-
-        //(void)lock;  // suppress warning until code gets written
-        
-        
-        
-        /*LAB3*/
-
-        KASSERT(lock != NULL);
-	KASSERT (curthread != NULL);
+#if OPT_SYNCH
+	KASSERT(lock != NULL);
+	KASSERT(lock_do_i_hold(lock)); /*bloccati se non c'è ownership*/
 	
-	/*per assicurarmi che l'operazione sia atomica acquisisco lo spinlock del lock*/
+	/*prima di fare wakeone devo acquisire lo spinlock*/
 	spinlock_acquire(&lock->lock_spinlock);
-	
-	/*mi assicuro che il lock sia effettivamente bloccato*/
-	KASSERT (lock->locked == true);
-	/*mi assicuro che colui che rilascia il lock sia lo stesso che lo ha acquisito*/
-	KASSERT (lock_do_i_hold(lock));
-	
-	/*sblocco il lock*/
-	lock->locked = false;
 	lock->thread_who_acquired = NULL;
-	
+#if SEM        
+        V(lock->lock_sem); //versione con semaforo
+#else
 	wchan_wakeone(lock->lock_wchan, &lock->lock_spinlock);
-	
-	/*fine dell'operazione atomica*/
+#endif
 	spinlock_release(&lock->lock_spinlock);
-	
+#endif
+        (void)lock;  // suppress warning until code gets written
         
 }
 bool
@@ -393,17 +265,19 @@ lock_do_i_hold(struct lock *lock)
 {
 /*funzione che ritorna vero se il thread possiede il lock*/
         // Write this
-
-        //(void)lock;  // suppress warning until code gets written
-  struct thread *current_thread = curthread;
-  if (current_thread == lock->thread_who_acquired) {
-	return true; // dummy until code gets written
-  }
-  else {
-	return false;
-  }
-}
+#if OPT_SYNCH
+	bool result;
+	
+	spinlock_acquire(&lock->lock_spinlock);
+	result = lock->thread_who_acquired == curthread;
+	spinlock_release(&lock->lock_spinlock);
+	return result;
 #endif
+        (void)lock;  // suppress warning until code gets written
+        return true;
+
+}
+
 
 ////////////////////////////////////////////////////////////
 //
@@ -426,6 +300,8 @@ cv_create(const char *name)
 	}
 
 	// add stuff here as needed
+#if OPT_SYNCH
+
 	/*LAB3: creo wchan e lock associati alla cv*/
 	cv->cv_wchan = wchan_create(cv->cv_name);
 	if (cv->cv_wchan == NULL) {
@@ -435,7 +311,7 @@ cv_create(const char *name)
 	}
 	
 	spinlock_init(&cv->cv_spinlock);
-
+#endif
 	return cv;
 }
 
@@ -445,9 +321,10 @@ cv_destroy(struct cv *cv)
 	KASSERT(cv != NULL);
 
 	// add stuff here as needed
-	/*libero spinlock e wchan*/
-	kfree(cv->cv_wchan);
+#if OPT_SYNCH
+	wchan_destroy(cv->cv_wchan);
 	spinlock_cleanup(&cv->cv_spinlock);
+#endif
 	kfree(cv->cv_name);
 	kfree(cv);
 }
@@ -457,23 +334,25 @@ void
 cv_wait(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	//(void)cv;    // suppress warning until code gets written
-	//(void)lock;  // suppress warning until code gets written
-	
+#if OPT_SYNCH	
 	/*LAB3: implemento cv_wait con wchan e spinlock*/
 	/*schema: rilascio il lock, vado in sleep, riacquisisco il lock*/
 	KASSERT(cv != NULL);
 	KASSERT(lock != NULL);
-	KASSERT(curthread != NULL);
+	KASSERT(lock_do_i_hold(lock)); /*fermati se non possiedo il lock*/
+	
+	/*acquisisco lo spinlock */
+	spinlock_acquire(&cv->cv_spinlock);
 	/*1: rilascio il lock acquisito*/
 	lock_release(lock);
-	
-	/*2: vado a dormire, ma prima devo acquisire lo spinlock*/
-	spinlock_acquire(&cv->cv_spinlock);
+	/*2: vado a dormire*/
 	wchan_sleep(cv->cv_wchan, &cv->cv_spinlock);
 	spinlock_release(&cv->cv_spinlock);
 	/*3: prima di ritornare riacquisisco il lock*/
 	lock_acquire(lock);
+#endif
+        (void)cv;    // suppress warning until code gets written
+        (void)lock;  // suppress warning until code gets written
 }
 
 /*operazione atomica*/
@@ -481,30 +360,33 @@ void
 cv_signal(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	//(void)cv;    // suppress warning until code gets written
-	//(void)lock;  // suppress warning until code gets written
-	
+#if OPT_SYNCH
 	/*LAB3: implemento cv_signal con wchan e spinlock*/
 	KASSERT(cv != NULL);
 	KASSERT(lock != NULL);
-	KASSERT(curthread != NULL);
+	KASSERT(lock_do_i_hold(lock));
 	spinlock_acquire(&cv->cv_spinlock);
 	wchan_wakeone(cv->cv_wchan, &cv->cv_spinlock);
 	spinlock_release(&cv->cv_spinlock);
+#endif
+	(void)cv;    // suppress warning until code gets written
+	(void)lock;  // suppress warning until code gets written
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
 	// Write this
-	//(void)cv;    // suppress warning until code gets written
-	//(void)lock;  // suppress warning until code gets written
+#if OPT_SYNCH
 	
 	/*LAB3: implemento cv_broadcast con wchan e spinlock*/
 	KASSERT(cv != NULL);
 	KASSERT(lock != NULL);
-	KASSERT(curthread != NULL);
+	KASSERT(lock_do_i_hold(lock));
 	spinlock_acquire(&cv->cv_spinlock);
 	wchan_wakeall(cv->cv_wchan, &cv->cv_spinlock);
 	spinlock_release(&cv->cv_spinlock);
+#endif
+	(void)cv;    // suppress warning until code gets written
+	(void)lock;  // suppress warning until code gets written
 }
