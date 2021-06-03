@@ -139,6 +139,10 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
+	 /*LAB04: devo gestire waitpid --> exit_code = proc_wait(proc);*/
+	 int exit_code;
+	 exit_code = proc_wait(proc);
+	 kprintf("Process terminated with code %d.\n", exit_code);
 
 	return 0;
 }

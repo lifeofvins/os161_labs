@@ -80,6 +80,7 @@ syscall(struct trapframe *tf)
 	int callno;
 	int32_t retval;
 	int err = 0; /*inizializzazione fatta da me perchè boh mi diceva uninitialized e non compilava*/
+	int exit_status = 0; /*LAB4*/
 
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
@@ -128,7 +129,8 @@ syscall(struct trapframe *tf)
                 break;
 	    case SYS__exit:
 	        /* TODO: just avoid crash */
- 	        sys__exit((int)tf->tf_a0);
+ 	        //sys__exit((int)tf->tf_a0);
+ 	        sys__exit(exit_status);
                 break;
 #endif
 

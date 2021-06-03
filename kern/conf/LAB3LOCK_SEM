@@ -33,4 +33,8 @@ options sfs			# Always use the file system
 
 options dumbvm			# Chewing gum and baling wire.
 
+#lab2 os161
+options syscalls
+
+#lab3 os161
 options synch

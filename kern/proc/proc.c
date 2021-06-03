@@ -49,6 +49,8 @@
 #include <addrspace.h>
 #include <vnode.h>
 
+#define USE_SEM 1 /*LAB4: per usare semafori o cv*/
+
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -81,7 +83,23 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-
+	
+	/*LAB4: creo sem e cv del proc*/
+#if USE_SEM
+	proc->proc_sem = sem_create(proc->p_name, 0);
+	if (proc->proc_sem == NULL) {
+		panic("proc_sem create failed!\n");
+	}
+#else
+	proc->proc_cv = cv_create(proc->p_name);
+	if (proc->proc_cv == NULL) {
+		panic("proc_cv create failed!\n");
+	}
+	proc->proc_lock = lock_create(proc->p_name);
+	if (proc->proc_lock == NULL) {
+		panic("proc_lock create failed!\n");
+	}
+#endif
 	return proc;
 }
 
@@ -317,4 +335,22 @@ proc_setas(struct addrspace *newas)
 	proc->p_addrspace = newas;
 	spinlock_release(&proc->p_lock);
 	return oldas;
+}
+
+
+/*LAB4: implement proc_wait for waitpid()*/
+int proc_wait(struct proc *p) {
+	/*INSERT CODE HERE*/
+#if USE_SEM
+	P(p->proc_sem);
+#else
+	/*condition variable*/
+	lock_acquire(p->proc_lock);
+	while (p->status != 0) {
+		cv_wait(p->proc_cv, p->proc_lock);
+	}
+	lock_release(p->proc_lock);
+#endif
+	//proc_destroy(p);
+	return 0;
 }

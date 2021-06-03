@@ -9,7 +9,7 @@ void thread_exit(void);
 /*
  * AUthor: G.Cabodi
  * Very simple implementation of sys__exit.
- * It just avoids crash/panic. Full process exit still TODO
+ * It just avoids crash/panic. Full process exit still TODO 
  * Address space is released
  */
 
@@ -23,6 +23,11 @@ void thread_exit(void);
 #include <thread.h>
 #include <addrspace.h>
 
+/*LAB4*/
+
+#include <synch.h> 
+#include <current.h>
+#define USE_SEM 1
 /*
  * simple proc management system calls
  */
@@ -30,11 +35,25 @@ void
 sys__exit(int status)
 {
   /* get address space of current process and destroy */
-  struct addrspace *as = proc_getas();
-  as_destroy(as);
+  //struct addrspace *as = proc_getas();
+  //as_destroy(as);
   /* thread exits. proc data structure will be lost */
-  thread_exit(); /*per il momento si blocca nel ciclo do{} while (next == NULL) all'interno di questa funzione, forse perchè lascio il thread come zombie*/
+  
+  
+  //thread_exit(); 
 
-  panic("thread_exit returned (should not happen)\n");
-  (void) status; // TODO: status handling
+  //panic("thread_exit returned (should not happen)\n");
+  //(void) status; // TODO: status handling
+  
+  
+  /*LAB04: gestire il signal per proc_wait*/
+  curproc->status = status; /*salvo lo stato di uscita del processo*/
+#if USE_SEM
+  	V(curproc->proc_sem);
+#else
+	/*condition variable*/
+	cv_signal(curproc->proc_cv, curproc->proc_lock);
+	
+#endif
+  thread_exit();
 }
