@@ -27,7 +27,7 @@ void thread_exit(void);
 
 #include <synch.h> 
 #include <current.h>
-#define USE_SEM 1
+#define USE_SEM 1 /*LAB4*/
 /*
  * simple proc management system calls
  */
@@ -47,13 +47,26 @@ sys__exit(int status)
   
   
   /*LAB04: gestire il signal per proc_wait*/
-  curproc->status = status; /*salvo lo stato di uscita del processo*/
+  	
+  	
+  
 #if USE_SEM
-  	V(curproc->proc_sem);
+	struct proc *proc = curproc;
+	struct thread *th = curthread;
+	proc->status = status; /*salvo lo stato di uscita del processo*/
+	proc_remthread(th); /*rimuovo il thread dal processo prima di segnalare*/
+  	V(proc->proc_sem);
+  	/*sys__exit terminates the thread, does not destroy the data structure of the process, but simply signals its termination*/
 #else
 	/*condition variable*/
+	lock_acquire(curproc->proc_lock);
+	kprintf("SYS EXIT: Proc %s acquired lock.\n", curproc->p_name);
+	curproc->status = status; /*salvo lo stato di uscita del processo*/
 	cv_signal(curproc->proc_cv, curproc->proc_lock);
-	
+	lock_release(curproc->proc_lock);
+	kprintf("SYS EXIT: Proc %s released lock.\n", curproc->p_name);	
 #endif
+  /*call proc_remthread() before signalling the end of the process and modify thread_exit() function so that it accepts a thread already detached from the process*/
+  /*signals the end of the process before calling thread_exit()*/
   thread_exit();
 }

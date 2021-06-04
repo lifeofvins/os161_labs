@@ -788,6 +788,7 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 void
 thread_exit(void)
 {
+	
 	struct thread *cur;
 
 	cur = curthread;
@@ -796,9 +797,11 @@ thread_exit(void)
 	 * Detach from our process. You might need to move this action
 	 * around, depending on how your wait/exit works.
 	 */
-	proc_remthread(cur);
+	//proc_remthread(cur); /*la sposto per il lab4*/
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
+	
+	/*LAB4: detach a thread only if still attached to proc*/
 	KASSERT(cur->t_proc == NULL);
 
 	/* Check the stack guard band. */
@@ -808,6 +811,9 @@ thread_exit(void)
         splhigh();
 	thread_switch(S_ZOMBIE, NULL, NULL);
 	panic("braaaaaaaiiiiiiiiiiinssssss\n");
+	
+	/*LAB4: modify the thread_exit() function so that it accepts a thread already detached from the process
+	(be careful: not to require thread_exit() to ALWAYS see a detached thread because the thread_exit() is called also in other contexts, outside the sys__exit()*/
 }
 
 /*

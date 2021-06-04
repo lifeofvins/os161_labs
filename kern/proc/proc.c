@@ -91,14 +91,15 @@ proc_create(const char *name)
 		panic("proc_sem create failed!\n");
 	}
 #else
-	proc->proc_cv = cv_create(proc->p_name);
-	if (proc->proc_cv == NULL) {
-		panic("proc_cv create failed!\n");
-	}
 	proc->proc_lock = lock_create(proc->p_name);
 	if (proc->proc_lock == NULL) {
 		panic("proc_lock create failed!\n");
 	}
+	proc->proc_cv = cv_create(proc->p_name);
+	if (proc->proc_cv == NULL) {
+		panic("proc_cv create failed!\n");
+	}
+
 #endif
 	return proc;
 }
@@ -183,11 +184,19 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
-	KASSERT(proc->p_numthreads == 0);
+	KASSERT(proc->p_numthreads == 0); /*the proc_destroy() function requires that the process being destroyed no longer has active threads*/
 	spinlock_cleanup(&proc->p_lock);
-
+	/*LAB4: distruggo i campi che ho aggiunto in struct proc*/
+#if USE_SEM
+	sem_destroy(proc->proc_sem);
+#else
+	lock_destroy(proc->proc_lock);
+	cv_destroy(proc->proc_cv);
+#endif	
+	kprintf("Destroying process %s...\n", proc->p_name);
 	kfree(proc->p_name);
 	kfree(proc);
+	kprintf("Process correctly destroyed\n");
 }
 
 /*
@@ -275,6 +284,8 @@ proc_addthread(struct proc *proc, struct thread *t)
  * the timer interrupt context switch, and any other implicit uses
  * of "curproc".
  */
+ 
+ /*removes a thread from the process pointed by the thread*/
 void
 proc_remthread(struct thread *t)
 {
@@ -341,16 +352,20 @@ proc_setas(struct addrspace *newas)
 /*LAB4: implement proc_wait for waitpid()*/
 int proc_wait(struct proc *p) {
 	/*INSERT CODE HERE*/
+	KASSERT(p != NULL);
 #if USE_SEM
 	P(p->proc_sem);
 #else
 	/*condition variable*/
 	lock_acquire(p->proc_lock);
+	kprintf("PROC_WAIT: Proc %s acquired lock.\n", p->p_name);
 	while (p->status != 0) {
 		cv_wait(p->proc_cv, p->proc_lock);
 	}
 	lock_release(p->proc_lock);
+	kprintf("PROC_WAIT: Proc %s released lock.\n", p->p_name);
 #endif
-	//proc_destroy(p);
+
+	proc_destroy(p); 
 	return 0;
 }
