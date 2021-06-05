@@ -39,4 +39,5 @@ options syscalls
 #lab3 os161
 options synch
 
-#lab4: non aggiungo opzioni perchè modifico le syscalls
+#lab4
+options lab4

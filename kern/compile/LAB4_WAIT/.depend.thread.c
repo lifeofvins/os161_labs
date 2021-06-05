@@ -8,7 +8,7 @@ thread.o: ../../thread/thread.c ../../include/types.h \
  ../../include/wchan.h ../../include/thread.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h ../../include/threadprivate.h \
- ../../include/proc.h ../../include/synch.h opt-synch.h \
+ ../../include/proc.h ../../include/synch.h opt-synch.h opt-lab4.h \
  ../../include/current.h includelinks/machine/current.h \
  ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
  ../../include/mainbus.h ../../include/vnode.h

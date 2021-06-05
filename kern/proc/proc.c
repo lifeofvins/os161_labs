@@ -85,6 +85,7 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
 	
 	/*LAB4: creo sem e cv del proc*/
+#if OPT_LAB4
 #if USE_SEM
 	proc->proc_sem = sem_create(proc->p_name, 0);
 	if (proc->proc_sem == NULL) {
@@ -100,6 +101,7 @@ proc_create(const char *name)
 		panic("proc_cv create failed!\n");
 	}
 
+#endif
 #endif
 	return proc;
 }
@@ -186,6 +188,7 @@ proc_destroy(struct proc *proc)
 
 	KASSERT(proc->p_numthreads == 0); /*the proc_destroy() function requires that the process being destroyed no longer has active threads*/
 	spinlock_cleanup(&proc->p_lock);
+#if OPT_LAB4
 	/*LAB4: distruggo i campi che ho aggiunto in struct proc*/
 #if USE_SEM
 	sem_destroy(proc->proc_sem);
@@ -197,6 +200,7 @@ proc_destroy(struct proc *proc)
 	kfree(proc->p_name);
 	kfree(proc);
 	kprintf("Process correctly destroyed\n");
+#endif
 }
 
 /*
@@ -350,6 +354,7 @@ proc_setas(struct addrspace *newas)
 
 
 /*LAB4: implement proc_wait for waitpid()*/
+#if OPT_LAB4
 int proc_wait(struct proc *p) {
 	/*INSERT CODE HERE*/
 	KASSERT(p != NULL);
@@ -369,3 +374,4 @@ int proc_wait(struct proc *p) {
 	proc_destroy(p); 
 	return 0;
 }
+#endif

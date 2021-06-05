@@ -28,28 +28,14 @@ void thread_exit(void);
 #include <synch.h> 
 #include <current.h>
 #define USE_SEM 1 /*LAB4*/
+
 /*
  * simple proc management system calls
  */
 void
 sys__exit(int status)
 {
-  /* get address space of current process and destroy */
-  //struct addrspace *as = proc_getas();
-  //as_destroy(as);
-  /* thread exits. proc data structure will be lost */
-  
-  
-  //thread_exit(); 
-
-  //panic("thread_exit returned (should not happen)\n");
-  //(void) status; // TODO: status handling
-  
-  
-  /*LAB04: gestire il signal per proc_wait*/
-  	
-  	
-  
+#if OPT_LAB4
 #if USE_SEM
 	struct proc *proc = curproc;
 	struct thread *th = curthread;
@@ -69,4 +55,14 @@ sys__exit(int status)
   /*call proc_remthread() before signalling the end of the process and modify thread_exit() function so that it accepts a thread already detached from the process*/
   /*signals the end of the process before calling thread_exit()*/
   thread_exit();
+ #else
+   /* get address space of current process and destroy */
+  struct addrspace *as = proc_getas();
+  as_destroy(as);
+  /* thread exits. proc data structure will be lost */
+  thread_exit(); /*per il momento si blocca nel ciclo do{} while (next == NULL) all'interno di questa funzione, forse perchè lascio il thread come zombie*/
+
+  panic("thread_exit returned (should not happen)\n");
+  (void) status; // TODO: status handling
+#endif
 }

@@ -140,10 +140,11 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 	 /*LAB04: devo gestire waitpid --> exit_code = proc_wait(proc);*/
+#if OPT_LAB4
 	 int exit_code;
 	 exit_code = proc_wait(proc);
 	 kprintf("Process %s terminated with code %d.\n", args[0], exit_code);
-
+#endif
 	return 0;
 }
 

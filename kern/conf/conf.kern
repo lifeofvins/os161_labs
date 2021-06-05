@@ -456,3 +456,7 @@ optfile syscalls syscall/proc_syscalls.c
 #DEFINISCO OPZIONI PER SYNCH LAB3 OS161
 defoption synch
 optfile synch thread/synch.c
+
+#DEFINISCO OPZIONI PER LAB4 (PROC_WAIT)
+defoption lab4
+#optfile lab4 proc/proc.c
