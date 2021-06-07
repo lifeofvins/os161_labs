@@ -791,25 +791,6 @@ thread_exit(void)
 	struct thread *cur;
 
 	cur = curthread;
-#if OPT_LAB4
-
-	/*
-	 * Detach from our process. You might need to move this action
-	 * around, depending on how your wait/exit works.
-	 */
-	//proc_remthread(cur);
-
-	/* Make sure we *are* detached (move this only if you're sure!) */
-	KASSERT(cur->t_proc == NULL);
-
-	/* Check the stack guard band. */
-	thread_checkstack(cur);
-
-	/* Interrupts off on this processor */
-        splhigh();
-	thread_switch(S_ZOMBIE, NULL, NULL);
-	panic("braaaaaaaiiiiiiiiiiinssssss\n");
-#else 
 	proc_remthread(cur);
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
@@ -822,7 +803,6 @@ thread_exit(void)
         splhigh();
 	thread_switch(S_ZOMBIE, NULL, NULL);
 	panic("braaaaaaaiiiiiiiiiiinssssss\n");
-#endif
 }
 
 /*

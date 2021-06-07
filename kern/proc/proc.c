@@ -48,172 +48,33 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <types.h> /*LAB4: per type pid*/
+#include <synch.h> /*LAB4: per manipolare il contatore dei processi(?)*/
 
 #define USE_SEM 1 /*LAB4: per usare semafori o cv*/
+#define MAX_PROC 100 /*LAB4: dimensione massima della tabella dei processi*/
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
+
+ /*creo la tabella di processi per trovare il pid corrispondente al processo di cui faccio waitpid che richiama proc_wait*/
+#if OPT_LAB4
+
+ 	/*tabella come vettore di puntatori a proc il cui indice sarebbe il pid del processo, oppure metto direttamente un campo pid*/
+ 	static struct _processTable {
+ 		int active; /*initial value 0*/
+ 		struct proc *proc[MAX_PROC+1]; /*[0] not used. pids are >= 1*/
+ 		int last_i; /*index of last allocated pid*/
+ 		struct spinlock lk; /*lock for this table*/
+ 	} processTable;
+#endif
+
 struct proc *kproc;
 
-/*
- * Create a proc structure.
- */
-static
-struct proc *
-proc_create(const char *name)
-{
-	struct proc *proc;
 
-	proc = kmalloc(sizeof(*proc));
-	if (proc == NULL) {
-		return NULL;
-	}
-	proc->p_name = kstrdup(name);
-	if (proc->p_name == NULL) {
-		kfree(proc);
-		return NULL;
-	}
 
-	proc->p_numthreads = 0;
-	spinlock_init(&proc->p_lock);
 
-	/* VM fields */
-	proc->p_addrspace = NULL;
-
-	/* VFS fields */
-	proc->p_cwd = NULL;
-	
-	/*LAB4: creo sem e cv del proc*/
-#if OPT_LAB4
-#if USE_SEM
-	proc->proc_sem = sem_create(proc->p_name, 0);
-	if (proc->proc_sem == NULL) {
-		panic("proc_sem create failed!\n");
-	}
-#else
-	proc->proc_lock = lock_create(proc->p_name);
-	if (proc->proc_lock == NULL) {
-		panic("proc_lock create failed!\n");
-	}
-	proc->proc_cv = cv_create(proc->p_name);
-	if (proc->proc_cv == NULL) {
-		panic("proc_cv create failed!\n");
-	}
-
-#endif
-#endif
-	return proc;
-}
-
-/*
- * Destroy a proc structure.
- *
- * Note: nothing currently calls this. Your wait/exit code will
- * probably want to do so.
- */
-void
-proc_destroy(struct proc *proc)
-{
-	/*
-	 * You probably want to destroy and null out much of the
-	 * process (particularly the address space) at exit time if
-	 * your wait/exit design calls for the process structure to
-	 * hang around beyond process exit. Some wait/exit designs
-	 * do, some don't.
-	 */
-
-	KASSERT(proc != NULL);
-	KASSERT(proc != kproc);
-
-	/*
-	 * We don't take p_lock in here because we must have the only
-	 * reference to this structure. (Otherwise it would be
-	 * incorrect to destroy it.)
-	 */
-
-	/* VFS fields */
-	if (proc->p_cwd) {
-		VOP_DECREF(proc->p_cwd);
-		proc->p_cwd = NULL;
-	}
-
-	/* VM fields */
-	if (proc->p_addrspace) {
-		/*
-		 * If p is the current process, remove it safely from
-		 * p_addrspace before destroying it. This makes sure
-		 * we don't try to activate the address space while
-		 * it's being destroyed.
-		 *
-		 * Also explicitly deactivate, because setting the
-		 * address space to NULL won't necessarily do that.
-		 *
-		 * (When the address space is NULL, it means the
-		 * process is kernel-only; in that case it is normally
-		 * ok if the MMU and MMU- related data structures
-		 * still refer to the address space of the last
-		 * process that had one. Then you save work if that
-		 * process is the next one to run, which isn't
-		 * uncommon. However, here we're going to destroy the
-		 * address space, so we need to make sure that nothing
-		 * in the VM system still refers to it.)
-		 *
-		 * The call to as_deactivate() must come after we
-		 * clear the address space, or a timer interrupt might
-		 * reactivate the old address space again behind our
-		 * back.
-		 *
-		 * If p is not the current process, still remove it
-		 * from p_addrspace before destroying it as a
-		 * precaution. Note that if p is not the current
-		 * process, in order to be here p must either have
-		 * never run (e.g. cleaning up after fork failed) or
-		 * have finished running and exited. It is quite
-		 * incorrect to destroy the proc structure of some
-		 * random other process while it's still running...
-		 */
-		struct addrspace *as;
-
-		if (proc == curproc) {
-			as = proc_setas(NULL);
-			as_deactivate();
-		}
-		else {
-			as = proc->p_addrspace;
-			proc->p_addrspace = NULL;
-		}
-		as_destroy(as);
-	}
-
-	KASSERT(proc->p_numthreads == 0); /*the proc_destroy() function requires that the process being destroyed no longer has active threads*/
-	spinlock_cleanup(&proc->p_lock);
-#if OPT_LAB4
-	/*LAB4: distruggo i campi che ho aggiunto in struct proc*/
-#if USE_SEM
-	sem_destroy(proc->proc_sem);
-#else
-	lock_destroy(proc->proc_lock);
-	cv_destroy(proc->proc_cv);
-#endif	
-	kprintf("Destroying process %s...\n", proc->p_name);
-	kfree(proc->p_name);
-	kfree(proc);
-	kprintf("Process correctly destroyed\n");
-#endif
-}
-
-/*
- * Create the process structure for the kernel.
- */
-void
-proc_bootstrap(void)
-{
-	kproc = proc_create("[kernel]");
-	if (kproc == NULL) {
-		panic("proc_create for kproc failed\n");
-	}
-}
 
 /*
  * Create a fresh proc for use by runprogram.
@@ -354,24 +215,243 @@ proc_setas(struct addrspace *newas)
 
 
 /*LAB4: implement proc_wait for waitpid()*/
+/*funzione che associa il pid che passo come parametro al processo nella tabella dei processi*/
+struct proc *proc_search_pid(pid_t pid) {
 #if OPT_LAB4
+	struct proc *proc;
+	KASSERT(pid >= 0 && pid < MAX_PROC);
+	proc = processTable.proc[pid];
+	KASSERT(proc->p_pid == pid); /*bloccati se i pid della struct proc e del proc nella table non corrispondono*/
+	return proc;
+#else
+	(void)pid;
+	return NULL;
+#endif
+}
+static void proc_init_waitpid(struct proc *proc, const char *name) {
+#if OPT_LAB4
+	/*search a free index in table using a circular strategy*/
+	int i;
+	spinlock_acquire(&processTable.lk); /*la tabella è una variabile globale*/
+	i = processTable.last_i+1; /*"aggiungo" il processo alla tabella*/
+	proc->pid = 0;
+	if (i > MAX_PROC) i = 1; /*se ho superato il numero di processi allora ricomincio dal primo --> circular strategy*/
+	while (i != processTable.last_i) {
+		if (processTable.proc[i] == NULL) {
+			processTable.proc[i] = proc;
+			processTable.last_i = i;
+			proc->pid = i;
+			break;
+		}
+		i++;
+		if (i > MAX_PROC) i = 1;
+	}
+	spinlock_release(&processTable.lk);
+	if (proc->pid == 0) {
+		panic("Too many processes. proc table is full\n");
+	}
+	proc->status = 0;
+#if USE_SEM
+	proc->proc_sem = sem_create(name, 0);
+#else
+	proc->proc_cv = cv_create(name);
+	proc->proc_lock = lock_create(name);
+#endif
+#else /*NO OPT_LAB4*/
+	(void)proc;
+	(void)name;
+#endif /*OPT_LAB4*/
+}
+
+/*terminate support for pid/waitpid*/
+static void proc_end_waitpid(struct proc *proc) {
+#if OPT_LAB4
+	/*remove the process from the table*/
+	int i;
+	spinlock_acquire(&processTable.lk);
+	i = proc->pid;
+	KASSERT (i > 0 && i < MAX_PROC);
+	spinlock_release(&processTable.lk);
+#if USE_SEM
+	sem_destroy(proc->proc_sem);
+#else
+	cv_destroy(proc->proc_cv);
+	lock_destroy(proc->proc_lock);
+#endif /*USE_SEM*/
+#else
+	(void)proc;
+#endif /*OPT_LAB4*/
+}
+
+/*
+ * Create a proc structure.
+ */
+static
+struct proc *
+proc_create(const char *name)
+{
+	struct proc *proc;
+
+	proc = kmalloc(sizeof(*proc));
+	if (proc == NULL) {
+		return NULL;
+	}
+	proc->p_name = kstrdup(name);
+	if (proc->p_name == NULL) {
+		kfree(proc);
+		return NULL;
+	}
+
+	proc->p_numthreads = 0;
+	spinlock_init(&proc->p_lock);
+
+	/* VM fields */
+	proc->p_addrspace = NULL;
+
+	/* VFS fields */
+	proc->p_cwd = NULL;
+	
+	/*LAB*/
+	proc_init_waitpid(proc, name);
+	return proc;
+}
+	
+/*
+ * Destroy a proc structure.
+ *
+ * Note: nothing currently calls this. Your wait/exit code will
+ * probably want to do so.
+ */
+void
+proc_destroy(struct proc *proc)
+{
+	/*
+	 * You probably want to destroy and null out much of the
+	 * process (particularly the address space) at exit time if
+	 * your wait/exit design calls for the process structure to
+	 * hang around beyond process exit. Some wait/exit designs
+	 * do, some don't.
+	 */
+
+	KASSERT(proc != NULL);
+	KASSERT(proc != kproc);
+
+	/*
+	 * We don't take p_lock in here because we must have the only
+	 * reference to this structure. (Otherwise it would be
+	 * incorrect to destroy it.)
+	 */
+
+	/* VFS fields */
+	if (proc->p_cwd) {
+		VOP_DECREF(proc->p_cwd);
+		proc->p_cwd = NULL;
+	}
+
+	/* VM fields */
+	if (proc->p_addrspace) {
+		/*
+		 * If p is the current process, remove it safely from
+		 * p_addrspace before destroying it. This makes sure
+		 * we don't try to activate the address space while
+		 * it's being destroyed.
+		 *
+		 * Also explicitly deactivate, because setting the
+		 * address space to NULL won't necessarily do that.
+		 *
+		 * (When the address space is NULL, it means the
+		 * process is kernel-only; in that case it is normally
+		 * ok if the MMU and MMU- related data structures
+		 * still refer to the address space of the last
+		 * process that had one. Then you save work if that
+		 * process is the next one to run, which isn't
+		 * uncommon. However, here we're going to destroy the
+		 * address space, so we need to make sure that nothing
+		 * in the VM system still refers to it.)
+		 *
+		 * The call to as_deactivate() must come after we
+		 * clear the address space, or a timer interrupt might
+		 * reactivate the old address space again behind our
+		 * back.
+		 *
+		 * If p is not the current process, still remove it
+		 * from p_addrspace before destroying it as a
+		 * precaution. Note that if p is not the current
+		 * process, in order to be here p must either have
+		 * never run (e.g. cleaning up after fork failed) or
+		 * have finished running and exited. It is quite
+		 * incorrect to destroy the proc structure of some
+		 * random other process while it's still running...
+		 */
+		struct addrspace *as;
+
+		if (proc == curproc) {
+			as = proc_setas(NULL);
+			as_deactivate();
+		}
+		else {
+			as = proc->p_addrspace;
+			proc->p_addrspace = NULL;
+		}
+		as_destroy(as);
+	}
+
+	KASSERT(proc->p_numthreads == 0); /*the proc_destroy() function requires that the process being destroyed no longer has active threads*/
+	spinlock_cleanup(&proc->p_lock);
+	
+	/*LAB4*/
+	proc_end_waitpid(proc);
+	kfree(proc->p_name);
+	kfree(proc);
+}	
+
+
+
+
+/*
+ * Create the process structure for the kernel.
+ */
+void
+proc_bootstrap(void)
+{
+	kproc = proc_create("[kernel]");
+	if (kproc == NULL) {
+		panic("proc_create for kproc failed\n");
+	}
+#if OPT_LAB4
+	spinlock_init(&processTable.lk);
+	/*kernel process is not registered in the table*/
+	processTable.active = 1;
+#endif
+}
+
+
+
 int proc_wait(struct proc *p) {
+#if OPT_LAB4
 	/*INSERT CODE HERE*/
 	KASSERT(p != NULL);
+	KASSERT(p != kproc); /*riguarda solo i processi user*/
+	int status; /*valore di ritorno*/
 #if USE_SEM
 	P(p->proc_sem);
 #else
 	/*condition variable*/
 	lock_acquire(p->proc_lock);
-	kprintf("PROC_WAIT: Proc %s acquired lock.\n", p->p_name);
-	while (p->status != 0) {
-		cv_wait(p->proc_cv, p->proc_lock);
-	}
+	cv_wait(p->proc_cv);
 	lock_release(p->proc_lock);
-	kprintf("PROC_WAIT: Proc %s released lock.\n", p->p_name);
-#endif
+	
+#endif /*USE_SEM*/
 
+	status = p->status;
 	proc_destroy(p); 
+	return status;
+#else
+	/*this doesn't synchronize*/
+	(void)proc;
 	return 0;
+#endif /*OPT_LAB4*/
 }
-#endif
+
+
+

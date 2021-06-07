@@ -132,17 +132,16 @@ syscall(struct trapframe *tf)
                 break;
 	    case SYS__exit:
 	        /* TODO: just avoid crash */
-
- 	        
-#if OPT_LAB4
-
- 	        sys__exit(exit_status);
-#else
 		sys__exit((int)tf->tf_a0);
-#endif
                 break;
+	    case SYS_waitpid:
+	    	retval = sys_waitpid((pid_t)tf->tf_a0, /*registir in cui salvo gli argomenti della syscall(?)*/
+	    			(userptr_t)tf->tf_a1,
+	    			(int)tf->tf_a2);
+	    	if (retval < 0) err = ENOSYS;
+	    	else err = 0;
+	    	break;
 #endif
-
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;

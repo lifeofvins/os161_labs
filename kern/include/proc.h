@@ -40,6 +40,7 @@
 
 #include <spinlock.h>
 #include "opt-lab4.h" /*implement proc_wait*/
+#include <types.h> /*per pid_t in LAB4*/
 
 #define USE_SEM 1 /*LAB4: semafori o cv per exit*/
 
@@ -79,6 +80,7 @@ struct proc {
 	/*LAB4: aggiungo semaforo/condition variable per implementare waitpid()*/
 #if OPT_LAB4
 	int status; /*per exit*/
+	pid_t pid; /*per waitpid*/
 #if USE_SEM
 	struct semaphore *proc_sem;
 #else
@@ -87,6 +89,7 @@ struct proc {
 #endif
 #endif	
 };
+
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
@@ -116,6 +119,7 @@ struct addrspace *proc_setas(struct addrspace *);
 /*LAB4: proc wait*/
 #if OPT_LAB4
 int proc_wait(struct proc *p);
+struct proc *proc_search_pid(pid_t pid);
 #endif
 
 

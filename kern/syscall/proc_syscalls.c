@@ -36,26 +36,21 @@ void
 sys__exit(int status)
 {
 #if OPT_LAB4
-#if USE_SEM
+
 	struct proc *proc = curproc;
-	struct thread *th = curthread;
-	proc->status = status; /*salvo lo stato di uscita del processo*/
-	proc_remthread(th); /*rimuovo il thread dal processo prima di segnalare*/
+	proc->status = status & 0xff; /*just lower 8 bits returned*/
+
+	proc_remthread(curthread); /*rimuovo il thread dal processo prima di segnalare*/
+#if USE_SEM
   	V(proc->proc_sem);
-  	/*sys__exit terminates the thread, does not destroy the data structure of the process, but simply signals its termination*/
 #else
 	/*condition variable*/
-	lock_acquire(curproc->proc_lock);
-	kprintf("SYS EXIT: Proc %s acquired lock.\n", curproc->p_name);
-	curproc->status = status; /*salvo lo stato di uscita del processo*/
-	cv_signal(curproc->proc_cv, curproc->proc_lock);
-	lock_release(curproc->proc_lock);
-	kprintf("SYS EXIT: Proc %s released lock.\n", curproc->p_name);	
-#endif
-  /*call proc_remthread() before signalling the end of the process and modify thread_exit() function so that it accepts a thread already detached from the process*/
-  /*signals the end of the process before calling thread_exit()*/
-  thread_exit();
- #else
+	lock_acquire(proc->proc_lock);
+	cv_signal(proc->proc_cv);
+	lock_release(proc->proc_lock);
+#endif /*USE_SEM*/
+
+#else
    /* get address space of current process and destroy */
   struct addrspace *as = proc_getas();
   as_destroy(as);
@@ -66,3 +61,39 @@ sys__exit(int status)
   (void) status; // TODO: status handling
 #endif
 }
+
+/*implemento sys_waitpid*/
+int sys_waitpid(pid_t pid, userptr_t statusp, int options) {
+#if OPT_LAB4
+	struct proc *proc;
+	proc = proc_search_pid(pid); /*funzione che devo implementare in proc.c*/
+	int s;
+	(void)options; /*not handled*/
+	if (proc == NULL) return -1;
+	s = proc_wait(proc);
+	if (statusp != NULL) {
+		*(int*)statusp = s;
+	}
+	kprintf("Process %s returned with status %d\n", proc->p_name, s);
+	return pid;
+#else
+	(void)options;
+	(void)pid;
+	(void)statusp;
+	return -1;
+#endif	
+}
+
+
+
+pid_t sys_getpid(void) {
+#if OPT_LAB4
+	KASSERT(curproc != NULL);
+	return curproc->pid;
+#else
+	return -1;
+#endif;
+}
+
+
+
