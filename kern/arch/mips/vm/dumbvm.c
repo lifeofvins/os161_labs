@@ -97,7 +97,7 @@ void
 vm_bootstrap(void)
 {
   int i;
-  nRamFrames = ((int)ram_getsize())/PAGE_SIZE;  
+  nRamFrames = ((int)ram_getsize())/PAGE_SIZE;  /*ottengo la dimensione della ram e dimensiono il vettore in base a quante pagine mi vengono fuori*/
   /* alloc freeRamFrame and allocSize */  
   freeRamFrames = kmalloc(sizeof(unsigned char)*nRamFrames);
   if (freeRamFrames==NULL) return;  
@@ -107,7 +107,7 @@ vm_bootstrap(void)
     freeRamFrames = NULL; return;
   }
   for (i=0; i<nRamFrames; i++) {    
-    freeRamFrames[i] = (unsigned char)0;
+    freeRamFrames[i] = (unsigned char)0; /*allocati*/
     allocSize[i]     = 0;  /*non ancora liberato quindi non disponibile per essere riciclato*/
   }
   spinlock_acquire(&freemem_lock);

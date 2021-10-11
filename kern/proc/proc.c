@@ -48,239 +48,108 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-#include <types.h> /*LAB4: per type pid*/
-#include <synch.h> /*LAB4: per manipolare il contatore dei processi(?)*/
 
-#define USE_SEM 1 /*LAB4: per usare semafori o cv*/
-#define MAX_PROC 100 /*LAB4: dimensione massima della tabella dei processi*/
 
+#if OPT_WAITPID
+#include <synch.h>
+
+#define MAX_PROC 100
+static struct _processTable {
+  int active;           /* initial value 0 */
+  struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
+  int last_i;           /* index of last allocated pid */
+  struct spinlock lk;	/* Lock for this table */
+} processTable;
+
+#endif
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
-
- /*creo la tabella di processi per trovare il pid corrispondente al processo di cui faccio waitpid che richiama proc_wait*/
-#if OPT_LAB4
-
- 	/*tabella come vettore di puntatori a proc il cui indice sarebbe il pid del processo, oppure metto direttamente un campo pid*/
- 	static struct _processTable {
- 		int active; /*initial value 0*/
- 		struct proc *proc[MAX_PROC+1]; /*[0] not used. pids are >= 1*/
- 		int last_i; /*index of last allocated pid*/
- 		struct spinlock lk; /*lock for this table*/
- 	} processTable;
-#endif
-
 struct proc *kproc;
 
-
-
-
-
 /*
- * Create a fresh proc for use by runprogram.
- *
- * It will have no address space and will inherit the current
- * process's (that is, the kernel menu's) current directory.
+ * G.Cabodi - 2019
+ * Initialize support for pid/waitpid.
  */
 struct proc *
-proc_create_runprogram(const char *name)
-{
-	struct proc *newproc;
-
-	newproc = proc_create(name);
-	if (newproc == NULL) {
-		return NULL;
-	}
-
-	/* VM fields */
-
-	newproc->p_addrspace = NULL;
-
-	/* VFS fields */
-
-	/*
-	 * Lock the current process to copy its current directory.
-	 * (We don't need to lock the new process, though, as we have
-	 * the only reference to it.)
-	 */
-	spinlock_acquire(&curproc->p_lock);
-	if (curproc->p_cwd != NULL) {
-		VOP_INCREF(curproc->p_cwd);
-		newproc->p_cwd = curproc->p_cwd;
-	}
-	spinlock_release(&curproc->p_lock);
-
-	return newproc;
-}
-
-/*
- * Add a thread to a process. Either the thread or the process might
- * or might not be current.
- *
- * Turn off interrupts on the local cpu while changing t_proc, in
- * case it's current, to protect against the as_activate call in
- * the timer interrupt context switch, and any other implicit uses
- * of "curproc".
- */
-int
-proc_addthread(struct proc *proc, struct thread *t)
-{
-	int spl;
-
-	KASSERT(t->t_proc == NULL);
-
-	spinlock_acquire(&proc->p_lock);
-	proc->p_numthreads++;
-	spinlock_release(&proc->p_lock);
-
-	spl = splhigh();
-	t->t_proc = proc;
-	splx(spl);
-
-	return 0;
-}
-
-/*
- * Remove a thread from its process. Either the thread or the process
- * might or might not be current.
- *
- * Turn off interrupts on the local cpu while changing t_proc, in
- * case it's current, to protect against the as_activate call in
- * the timer interrupt context switch, and any other implicit uses
- * of "curproc".
- */
- 
- /*removes a thread from the process pointed by the thread*/
-void
-proc_remthread(struct thread *t)
-{
-	struct proc *proc;
-	int spl;
-
-	proc = t->t_proc;
-	KASSERT(proc != NULL);
-
-	spinlock_acquire(&proc->p_lock);
-	KASSERT(proc->p_numthreads > 0);
-	proc->p_numthreads--;
-	spinlock_release(&proc->p_lock);
-
-	spl = splhigh();
-	t->t_proc = NULL;
-	splx(spl);
-}
-
-/*
- * Fetch the address space of (the current) process.
- *
- * Caution: address spaces aren't refcounted. If you implement
- * multithreaded processes, make sure to set up a refcount scheme or
- * some other method to make this safe. Otherwise the returned address
- * space might disappear under you.
- */
-struct addrspace *
-proc_getas(void)
-{
-	struct addrspace *as;
-	struct proc *proc = curproc;
-
-	if (proc == NULL) {
-		return NULL;
-	}
-
-	spinlock_acquire(&proc->p_lock);
-	as = proc->p_addrspace;
-	spinlock_release(&proc->p_lock);
-	return as;
-}
-
-/*
- * Change the address space of (the current) process. Return the old
- * one for later restoration or disposal.
- */
-struct addrspace *
-proc_setas(struct addrspace *newas)
-{
-	struct addrspace *oldas;
-	struct proc *proc = curproc;
-
-	KASSERT(proc != NULL);
-
-	spinlock_acquire(&proc->p_lock);
-	oldas = proc->p_addrspace;
-	proc->p_addrspace = newas;
-	spinlock_release(&proc->p_lock);
-	return oldas;
-}
-
-
-/*LAB4: implement proc_wait for waitpid()*/
-/*funzione che associa il pid che passo come parametro al processo nella tabella dei processi*/
-struct proc *proc_search_pid(pid_t pid) {
-#if OPT_LAB4
-	struct proc *proc;
-	KASSERT(pid >= 0 && pid < MAX_PROC);
-	proc = processTable.proc[pid];
-	KASSERT(proc->p_pid == pid); /*bloccati se i pid della struct proc e del proc nella table non corrispondono*/
-	return proc;
+proc_search_pid(pid_t pid) {
+#if OPT_WAITPID
+  struct proc *p;
+  KASSERT(pid>=0&&pid<MAX_PROC);
+  p = processTable.proc[pid];
+  KASSERT(p->p_pid==pid);
+  return p;
 #else
-	(void)pid;
-	return NULL;
+  (void)pid;
+  return NULL;
 #endif
 }
-static void proc_init_waitpid(struct proc *proc, const char *name) {
-#if OPT_LAB4
-	/*search a free index in table using a circular strategy*/
-	int i;
-	spinlock_acquire(&processTable.lk); /*la tabella è una variabile globale*/
-	i = processTable.last_i+1; /*"aggiungo" il processo alla tabella*/
-	proc->pid = 0;
-	if (i > MAX_PROC) i = 1; /*se ho superato il numero di processi allora ricomincio dal primo --> circular strategy*/
-	while (i != processTable.last_i) {
-		if (processTable.proc[i] == NULL) {
-			processTable.proc[i] = proc;
-			processTable.last_i = i;
-			proc->pid = i;
-			break;
-		}
-		i++;
-		if (i > MAX_PROC) i = 1;
-	}
-	spinlock_release(&processTable.lk);
-	if (proc->pid == 0) {
-		panic("Too many processes. proc table is full\n");
-	}
-	proc->status = 0;
-#if USE_SEM
-	proc->proc_sem = sem_create(name, 0);
+
+/*
+ * G.Cabodi - 2019
+ * Initialize support for pid/waitpid.
+ */
+static void
+proc_init_waitpid(struct proc *proc, const char *name) {
+#if OPT_WAITPID
+  /* search a free index in table using a circular strategy */
+  int i;
+  spinlock_acquire(&processTable.lk);
+  i = processTable.last_i+1;
+  proc->p_pid = 0;
+  if (i>MAX_PROC) i=1;
+  while (i!=processTable.last_i) {
+    if (processTable.proc[i] == NULL) {
+      processTable.proc[i] = proc;
+      processTable.last_i = i;
+      proc->p_pid = i;
+      break;
+    }
+    i++;
+    if (i>MAX_PROC) i=1;
+  }
+  spinlock_release(&processTable.lk);
+  if (proc->p_pid==0) {
+    panic("too many processes. proc table is full\n");
+  }
+  proc->p_status = 0;
+
+#if USE_SEMAPHORE_FOR_WAITPID
+  proc->p_sem = sem_create(name, 0);
 #else
-	proc->proc_cv = cv_create(name);
-	proc->proc_lock = lock_create(name);
+  proc->p_cv = cv_create(name);
+  proc->p_lock = lock_create(name);
 #endif
-#else /*NO OPT_LAB4*/
-	(void)proc;
-	(void)name;
-#endif /*OPT_LAB4*/
+#else
+  (void)proc;
+  (void)name;
+#endif
 }
 
-/*terminate support for pid/waitpid*/
-static void proc_end_waitpid(struct proc *proc) {
-#if OPT_LAB4
-	/*remove the process from the table*/
-	int i;
-	spinlock_acquire(&processTable.lk);
-	i = proc->pid;
-	KASSERT (i > 0 && i < MAX_PROC);
-	spinlock_release(&processTable.lk);
-#if USE_SEM
-	sem_destroy(proc->proc_sem);
+/*
+ * G.Cabodi - 2019
+ * Terminate support for pid/waitpid.
+ */
+static void
+proc_end_waitpid(struct proc *proc) {
+#if OPT_WAITPID
+  /* remove the process from the table */
+  int i;
+  spinlock_acquire(&processTable.lk);
+  i = proc->p_pid;
+  KASSERT(i>0 && i<=MAX_PROC);
+  processTable.proc[i] = NULL;
+  spinlock_release(&processTable.lk);
+
+#if USE_SEMAPHORE_FOR_WAITPID
+  sem_destroy(proc->p_sem);
 #else
-	cv_destroy(proc->proc_cv);
-	lock_destroy(proc->proc_lock);
-#endif /*USE_SEM*/
+  cv_destroy(proc->p_cv);
+  lock_destroy(proc->p_lock);
+#endif
 #else
-	(void)proc;
-#endif /*OPT_LAB4*/
+  (void)proc;
+#endif
 }
 
 /*
@@ -310,12 +179,12 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-	
-	/*LAB*/
-	proc_init_waitpid(proc, name);
+
+	proc_init_waitpid(proc,name);
+
 	return proc;
 }
-	
+
 /*
  * Destroy a proc structure.
  *
@@ -396,17 +265,14 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
-	KASSERT(proc->p_numthreads == 0); /*the proc_destroy() function requires that the process being destroyed no longer has active threads*/
+	KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_lock);
-	
-	/*LAB4*/
+
 	proc_end_waitpid(proc);
+
 	kfree(proc->p_name);
 	kfree(proc);
-}	
-
-
-
+}
 
 /*
  * Create the process structure for the kernel.
@@ -418,40 +284,176 @@ proc_bootstrap(void)
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}
-#if OPT_LAB4
+#if OPT_WAITPID
 	spinlock_init(&processTable.lk);
-	/*kernel process is not registered in the table*/
+	/* kernel process is not registered in the table */
 	processTable.active = 1;
 #endif
 }
 
 
+/*
+ * Create a fresh proc for use by runprogram.
+ *
+ * It will have no address space and will inherit the current
+ * process's (that is, the kernel menu's) current directory.
+ */
+struct proc *
+proc_create_runprogram(const char *name)
+{
+	struct proc *newproc;
 
-int proc_wait(struct proc *p) {
-#if OPT_LAB4
-	/*INSERT CODE HERE*/
-	KASSERT(p != NULL);
-	KASSERT(p != kproc); /*riguarda solo i processi user*/
-	int status; /*valore di ritorno*/
-#if USE_SEM
-	P(p->proc_sem);
-#else
-	/*condition variable*/
-	lock_acquire(p->proc_lock);
-	cv_wait(p->proc_cv);
-	lock_release(p->proc_lock);
-	
-#endif /*USE_SEM*/
+	newproc = proc_create(name);
+	if (newproc == NULL) {
+		return NULL;
+	}
 
-	status = p->status;
-	proc_destroy(p); 
-	return status;
-#else
-	/*this doesn't synchronize*/
-	(void)proc;
+	/* VM fields */
+
+	newproc->p_addrspace = NULL;
+
+	/* VFS fields */
+
+	/*
+	 * Lock the current process to copy its current directory.
+	 * (We don't need to lock the new process, though, as we have
+	 * the only reference to it.)
+	 */
+	spinlock_acquire(&curproc->p_lock);
+	if (curproc->p_cwd != NULL) {
+		VOP_INCREF(curproc->p_cwd);
+		newproc->p_cwd = curproc->p_cwd;
+	}
+	spinlock_release(&curproc->p_lock);
+
+	return newproc;
+}
+
+/*
+ * Add a thread to a process. Either the thread or the process might
+ * or might not be current.
+ *
+ * Turn off interrupts on the local cpu while changing t_proc, in
+ * case it's current, to protect against the as_activate call in
+ * the timer interrupt context switch, and any other implicit uses
+ * of "curproc".
+ */
+int
+proc_addthread(struct proc *proc, struct thread *t)
+{
+	int spl;
+
+	KASSERT(t->t_proc == NULL);
+
+	spinlock_acquire(&proc->p_lock);
+	proc->p_numthreads++;
+	spinlock_release(&proc->p_lock);
+
+	spl = splhigh();
+	t->t_proc = proc;
+	splx(spl);
+
 	return 0;
-#endif /*OPT_LAB4*/
+}
+
+/*
+ * Remove a thread from its process. Either the thread or the process
+ * might or might not be current.
+ *
+ * Turn off interrupts on the local cpu while changing t_proc, in
+ * case it's current, to protect against the as_activate call in
+ * the timer interrupt context switch, and any other implicit uses
+ * of "curproc".
+ */
+void
+proc_remthread(struct thread *t)
+{
+	struct proc *proc;
+	int spl;
+
+	proc = t->t_proc;
+	KASSERT(proc != NULL);
+
+	spinlock_acquire(&proc->p_lock);
+	KASSERT(proc->p_numthreads > 0);
+	proc->p_numthreads--;
+	spinlock_release(&proc->p_lock);
+
+	spl = splhigh();
+	t->t_proc = NULL;
+	splx(spl);
+}
+
+/*
+ * Fetch the address space of (the current) process.
+ *
+ * Caution: address spaces aren't refcounted. If you implement
+ * multithreaded processes, make sure to set up a refcount scheme or
+ * some other method to make this safe. Otherwise the returned address
+ * space might disappear under you.
+ */
+struct addrspace *
+proc_getas(void)
+{
+	struct addrspace *as;
+	struct proc *proc = curproc;
+
+	if (proc == NULL) {
+		return NULL;
+	}
+
+	spinlock_acquire(&proc->p_lock);
+	as = proc->p_addrspace;
+	spinlock_release(&proc->p_lock);
+	return as;
+}
+
+/*
+ * Change the address space of (the current) process. Return the old
+ * one for later restoration or disposal.
+ */
+struct addrspace *
+proc_setas(struct addrspace *newas)
+{
+	struct addrspace *oldas;
+	struct proc *proc = curproc;
+
+	KASSERT(proc != NULL);
+
+	spinlock_acquire(&proc->p_lock);
+	oldas = proc->p_addrspace;
+	proc->p_addrspace = newas;
+	spinlock_release(&proc->p_lock);
+	return oldas;
 }
 
 
+
+        /* G.Cabodi - 2019 - support for waitpid */
+int 
+proc_wait(struct proc *proc)
+{
+#if OPT_WAITPID
+        int return_status;
+        /* NULL and kernel proc forbidden */
+	KASSERT(proc != NULL);
+	KASSERT(proc != kproc);
+
+        /* wait on semaphore or condition variable */ 
+#if USE_SEMAPHORE_FOR_WAITPID
+        P(proc->p_sem);
+#else
+        lock_acquire(proc->p_lock);
+        cv_wait(proc->p_cv);
+        lock_release(proc->p_lock);
+#endif
+        return_status = proc->p_status;
+        proc_destroy(proc);
+        return return_status;
+#else
+        /* this doesn't synchronize */ 
+        (void)proc;
+        return 0;
+#endif
+}
 

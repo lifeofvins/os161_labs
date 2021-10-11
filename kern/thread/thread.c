@@ -791,7 +791,13 @@ thread_exit(void)
 	struct thread *cur;
 
 	cur = curthread;
+	
+#if OPT_WAITPID
+	if (cur->t_proc != NULL)
+		proc_remthread(cur);
+#else
 	proc_remthread(cur);
+#endif
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
 	KASSERT(cur->t_proc == NULL);

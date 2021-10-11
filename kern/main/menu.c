@@ -117,10 +117,9 @@ common_prog(int nargs, char **args)
 	struct proc *proc;
 	int result;
 	
-	/*LAB4*/
-	pid_t pid;
-	//int exit_code;
-	int retpid; /*se la waitpid non fallisce ritorna il pid del processo*/
+	int exit_code;
+
+	//int retpid; /*se la waitpid non fallisce ritorna il pid del processo*/
 
 	/* Create a process for the new program to run in. */
 	/*è stato allocato il processo ma non è stato ancora eseguito niente*/
@@ -145,11 +144,9 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 	 /*LAB04: devo gestire waitpid --> exit_code = proc_wait(proc);*/
-#if OPT_LAB4
-	 pid = sys_getpid();
-	 kprintf("PID = %d. Begin waitpid.\n", pid);
-	 retpid = sys_waitpid(pid, 0);
-	 kprintf("Process %s (PID = %d) terminated\n", args[0], retpid);
+#if OPT_WAITPID
+	exit_code = proc_wait(proc);
+	return exit_code;
 #endif
 	return 0;
 }

@@ -194,5 +194,5 @@ main(void)
 	}
 
 	printf("IS a palindrome\n");
-	exit(0);
+	exit(0); /*call to syscall*/
 }

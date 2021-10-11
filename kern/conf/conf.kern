@@ -458,5 +458,7 @@ defoption synch
 optfile synch thread/synch.c
 
 #DEFINISCO OPZIONI PER LAB4 (PROC_WAIT)
-defoption lab4
-#optfile lab4 proc/proc.c
+defoption waitpid
+defoption fork
+optfile waitpid syscall/proc_syscalls.c
+optfile fork syscall/proc_syscalls.c

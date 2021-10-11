@@ -11,6 +11,10 @@
 #include <syscall.h>
 #include <lib.h>
 
+#if OPT_LAB5
+#include <proc.h>
+#endif
+
 /*
  * simple file system calls for write/read
  */
@@ -50,4 +54,18 @@ sys_read(int fd, userptr_t buf_ptr, size_t size)
   }
 
   return (int)size;
+}
+
+#if OPT_LAB5
+int sys_open(char *filename, int flag, int retfd) {
+/*1) opens a file: create an openfile item
+*2) obtain vnode from vfs_open()
+*3) initialize offset in openfile
+return the file descriptor of the openfile item
+*/
+	
+}
+
+int sys_close(int fd) {
+
 }

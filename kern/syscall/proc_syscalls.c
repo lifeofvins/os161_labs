@@ -1,20 +1,13 @@
-/*file con implementazione della system call exit
-In OS161, you can end user programs by calling the “_exit( )” system call. Without an implementation of _exit( ), the threads created to handle user programs will hang around forever, executing an infinite loop in the user space and taking up a lot of CPU time.
-*The function _exit() terminates the calling process "immediately". Any open file descriptors belonging to the process are closed; any children of the process are inherited by process 1, init, and the process's parent is sent a SIGCHLD signal. 
-*Tale funzione deve effettuare le chiamate a as_destroy() e thread_exit()
-*void as_destroy(struct addrspace *as);
-void thread_exit(void);
-*
-*/
 /*
  * AUthor: G.Cabodi
  * Very simple implementation of sys__exit.
- * It just avoids crash/panic. Full process exit still TODO 
+ * It just avoids crash/panic. Full process exit still TODO
  * Address space is released
  */
 
 #include <types.h>
 #include <kern/unistd.h>
+#include <kern/errno.h>
 #include <clock.h>
 #include <copyinout.h>
 #include <syscall.h>
@@ -22,78 +15,123 @@ void thread_exit(void);
 #include <proc.h>
 #include <thread.h>
 #include <addrspace.h>
-
-/*LAB4*/
-
-#include <synch.h> 
+#include <mips/trapframe.h>
 #include <current.h>
-#define USE_SEM 1 /*LAB4*/
+#include <synch.h>
 
 /*
- * simple proc management system calls
+ * system calls for process management
  */
 void
 sys__exit(int status)
 {
-#if OPT_LAB4
-
-	struct proc *proc = curproc;
-	proc->status = status & 0xff; /*just lower 8 bits returned*/
-
-	proc_remthread(curthread); /*rimuovo il thread dal processo prima di segnalare*/
-#if USE_SEM
-  	V(proc->proc_sem);
+#if OPT_WAITPID
+  struct proc *p = curproc;
+  p->p_status = status & 0xff; /* just lower 8 bits returned */
+  proc_remthread(curthread);
+#if USE_SEMAPHORE_FOR_WAITPID
+  V(p->p_sem);
 #else
-	/*condition variable*/
-	lock_acquire(proc->proc_lock);
-	cv_signal(proc->proc_cv);
-	lock_release(proc->proc_lock);
-#endif /*USE_SEM*/
-
+  lock_acquire(p->p_lock);
+  cv_signal(p->p_cv);
+  lock_release(p->p_lock);
+#endif
 #else
-   /* get address space of current process and destroy */
+  /* get address space of current process and destroy */
   struct addrspace *as = proc_getas();
   as_destroy(as);
-  /* thread exits. proc data structure will be lost */
-  thread_exit(); /*per il momento si blocca nel ciclo do{} while (next == NULL) all'interno di questa funzione, forse perchè lascio il thread come zombie*/
+#endif
+  thread_exit();
 
   panic("thread_exit returned (should not happen)\n");
   (void) status; // TODO: status handling
+}
+
+int
+sys_waitpid(pid_t pid, userptr_t statusp, int options)
+{
+#if OPT_WAITPID
+  struct proc *p = proc_search_pid(pid);
+  int s;
+  (void)options; /* not handled */
+  if (p==NULL) return -1;
+  s = proc_wait(p);
+  if (statusp!=NULL) 
+    *(int*)statusp = s;
+  return pid;
+#else
+  (void)options; /* not handled */
+  (void)pid;
+  (void)statusp;
+  return -1;
 #endif
 }
 
-/*implemento sys_waitpid*/
-int sys_waitpid(pid_t pid, userptr_t statusp, int options) {
-#if OPT_LAB4
-	struct proc *proc;
-	proc = proc_search_pid(pid); /*funzione che devo implementare in proc.c*/
-	int s;
-	(void)options; /*not handled*/
-	if (proc == NULL) return -1;
-	s = proc_wait(proc);
-	if (statusp != NULL) {
-		*(int*)statusp = s;
-	}
-	kprintf("Process %s returned with status %d\n", proc->p_name, s);
-	return pid;
+pid_t
+sys_getpid(void)
+{
+#if OPT_WAITPID
+  KASSERT(curproc != NULL);
+  return curproc->p_pid;
 #else
-	(void)options;
-	(void)pid;
-	(void)statusp;
-	return -1;
-#endif	
+  return -1;
+#endif
 }
 
-
-
-pid_t sys_getpid(void) {
-#if OPT_LAB4
-	KASSERT(curproc != NULL);
-	return curproc->pid;
-#else
-	return -1;
-#endif;
+#if OPT_FORK
+static void
+call_enter_forked_process(void *tfv, unsigned long dummy) {
+  struct trapframe *tf = (struct trapframe *)tfv;
+  (void)dummy;
+  enter_forked_process(tf); 
+ 
+  panic("enter_forked_process returned (should not happen)\n");
 }
 
+int sys_fork(struct trapframe *ctf, pid_t *retval) {
+  struct trapframe *tf_child;
+  struct proc *newp;
+  int result;
 
+  KASSERT(curproc != NULL);
 
+  newp = proc_create_runprogram(curproc->p_name);
+  if (newp == NULL) {
+    return ENOMEM;
+  }
+
+  /* done here as we need to duplicate the address space 
+     of thbe current process */
+  as_copy(curproc->p_addrspace, &(newp->p_addrspace));
+  if(newp->p_addrspace == NULL){
+    proc_destroy(newp); 
+    return ENOMEM; 
+  }
+
+  /* we need a copy of the parent's trapframe */
+  tf_child = kmalloc(sizeof(struct trapframe));
+  if(tf_child == NULL){
+    proc_destroy(newp);
+    return ENOMEM; 
+  }
+  memcpy(tf_child, ctf, sizeof(struct trapframe));
+
+  /* TO BE DONE: linking parent/child, so that child terminated 
+     on parent exit */
+
+  result = thread_fork(
+		 curthread->t_name, newp,
+		 call_enter_forked_process, 
+		 (void *)tf_child, (unsigned long)0/*unused*/);
+
+  if (result){
+    proc_destroy(newp);
+    kfree(tf_child);
+    return ENOMEM;
+  }
+
+  *retval = newp->p_pid;
+
+  return 0;
+}
+#endif
