@@ -56,16 +56,35 @@ sys_read(int fd, userptr_t buf_ptr, size_t size)
   return (int)size;
 }
 
-#if OPT_LAB5
 int sys_open(char *filename, int flag, int retfd) {
 /*1) opens a file: create an openfile item
 *2) obtain vnode from vfs_open()
 *3) initialize offset in openfile
 return the file descriptor of the openfile item
 */
+#if OPT_LAB5
+	struct proc *proc = curproc; 
+	struct openfile *openfile_item; /*create an openfile item*/
+	int err; /*return value of vfs_open*/
+	int openflags;
+	mode_t mode; /*boh*/
+	/*vfs_open prototype: int vfs_open(char *path, int openflags, mode_t mode, struct vnode **ret)*/
+	err = vfs_open(filename, openflags, mode, &openfile_item->vnode); /*obtain vnode from vfs_open()*/
+	openfile_item->offset = 0; /*initialize offset in openfile*/
+	
+	/*we have to place openfile in systemFileTable*/
+	
+#else
+	return 0;
+#endif
 	
 }
 
 int sys_close(int fd) {
+#if OPT_LAB5
 
+#else
+	return 0;
+#endif
 }
+
