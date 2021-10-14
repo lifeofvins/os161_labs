@@ -2,7 +2,7 @@
 #ifndef _FILETABLE_H_
 #define _FILETABLE_H_
 
-#if OPT_FILE
+
 
 #include <lib.h>
 #include <array.h>
@@ -13,6 +13,7 @@
 #define MAX_FILES 50
 
 /*definisco la struct openfile*/
+#if OPT_FILE
 struct openfile {
 	struct vnode *vn; /*pointer to vnode*/
 	mode_t mode; /*read-only, write-only, read-write*/
@@ -39,14 +40,14 @@ fileTable *create_fileTable(void);
 int init_fileTable(fileTable *ft);
 
 /*adds file to fileTable: returns the index of where the file was added or -1 on error*/
-int add_file(fileTable *ft, unsigned int fd);
+int add_file(fileTable *ft, openfile *file, int init, int *err);
 
 /*removes file at index: returns 1 if removed from tail, 0 from elsewhere, or -1 on error*/
 int remove_from_fileTable(fileTable *ft, unsigned int fd);
 
 
 /* Returns file at index, or NULL on error. */
-openfile * get_file_at_index (filetable *ft, unsigned int fd);
+struct openfile * get_file_at_index (filetable *ft, unsigned int fd);
 
 
 /*sets file at index to file: returns 0 on success, -1 on failure*/

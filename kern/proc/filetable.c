@@ -15,9 +15,9 @@
 
 /*qui definisco le funzioni della fileTable*/
 
-fileTable *create_fileTable(void) {
+struct fileTable *create_fileTable(void) {
 	int i; /*index*/
-	fileTable *ft = NULL;
+	struct fileTable *ft = NULL;
 	
 	/*allocation*/
 	ft = (fileTable *)kmalloc(sizeof(fileTable));
@@ -171,7 +171,7 @@ int remove_from_fileTable(fileTable *ft, unsigned int fd) {
 	return 0;
 }
 
-openfile * get_file_at_index (filetable *ft, unsigned int fd) {
+struct openfile * get_file_at_index (filetable *ft, unsigned int fd) {
 
 	openfile *file = NULL;
 	KASSERT(ft != NULL);

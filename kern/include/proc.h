@@ -39,9 +39,8 @@
 #include <spinlock.h>
 #include "opt-waitpid.h"
 
-#if OPT_FILE
 #include <filetable.h>
-#endif
+
 
 struct addrspace;
 struct thread;
@@ -97,7 +96,7 @@ struct proc {
 #endif
 
 #if OPT_FILE
-	struct fileTable perProcessFileTable;
+	struct fileTable *perProcessFileTable;
 
 #endif
 };

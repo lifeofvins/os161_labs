@@ -6,4 +6,5 @@ file_syscalls.o: ../../syscall/file_syscalls.c ../../include/types.h \
  opt-syscalls.h opt-fork.h ../../include/lib.h opt-noasserts.h \
  ../../include/proc.h ../../include/spinlock.h ../../include/hangman.h \
  opt-hangman.h includelinks/machine/spinlock.h opt-waitpid.h \
- ../../include/filetable.h
+ ../../include/filetable.h ../../include/array.h ../../include/synch.h \
+ opt-synch.h ../../include/vnode.h

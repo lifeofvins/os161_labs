@@ -9,6 +9,7 @@ semfs_vnops.o: ../../fs/semfs/semfs_vnops.c ../../include/types.h \
  ../../include/thread.h ../../include/array.h ../../include/lib.h \
  opt-noasserts.h ../../include/threadlist.h includelinks/machine/thread.h \
  ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
- ../../include/proc.h opt-waitpid.h ../../include/current.h \
- includelinks/machine/current.h ../../include/vfs.h ../../include/vnode.h \
+ ../../include/proc.h opt-waitpid.h ../../include/filetable.h \
+ ../../include/vnode.h ../../include/current.h \
+ includelinks/machine/current.h ../../include/vfs.h \
  ../../fs/semfs/semfs.h ../../include/fs.h

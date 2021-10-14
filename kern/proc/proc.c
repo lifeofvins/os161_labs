@@ -49,6 +49,8 @@
 #include <addrspace.h>
 #include <vnode.h>
 
+/*per lab05*/
+#include <filetable.h>
 
 #if OPT_WAITPID
 #include <synch.h>
@@ -181,6 +183,10 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
 
 	proc_init_waitpid(proc,name);
+#if OPT_FILE
+	/*create per process fileTable*/
+	proc->perProcessFileTable = create_fileTable();
+#endif
 
 	return proc;
 }
