@@ -39,6 +39,10 @@
 #include <spinlock.h>
 #include "opt-waitpid.h"
 
+#if OPT_FILE
+#include <filetable.h>
+#endif
+
 struct addrspace;
 struct thread;
 struct vnode;
@@ -67,24 +71,6 @@ struct vnode;
 #define USE_SEMAPHORE_FOR_WAITPID 1
 #endif
 
-#if OPT_LAB5
-/*definisco la struct openfile*/
-struct openfile {
-	struct vnode *vnode; /*pointer to vnode*/
-	mode_t mode; /*read-only, write-only, read-write*/
-	int offset; /*ad ogni openfile corrisponderà un offset, cioè dove stanno leggendo e scrivendo dentro al file: l'offset avanza man mano che si legge o scrive nel file*/
-	struct lock *lock;
-	int ref_count; /*una openfile potrebbe essere condivisa*/
-};
-
-#define MAX_OPENFILE 100
-struct fileTable {
-	struct openfile *fileTable[MAX_OPENFILE+1];
-	int last_i; /*index of the last allocated openfile item*/
-	struct spinlock spinlock; /*lock for this array*/
-} fileTable;
-
-#endif
 
 struct proc {
 	char *p_name;			/* Name of this process */
@@ -110,10 +96,10 @@ struct proc {
 #endif
 #endif
 
-#if OPT_LAB5
+#if OPT_FILE
 	struct fileTable perProcessFileTable;
 
-
+#endif
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

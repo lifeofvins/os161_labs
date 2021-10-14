@@ -11,9 +11,15 @@
 #include <syscall.h>
 #include <lib.h>
 
-#if OPT_LAB5
+/*per lab05*/
 #include <proc.h>
-#endif
+#include <filetable.h>
+
+/*max num of system wide open file*/
+#define SYSTEM_OPEN_MAX 10*MAX_FILES
+
+
+struct fileTable systemFileTable[SYSTEM_OPEN_MAX];
 
 /*
  * simple file system calls for write/read
@@ -62,29 +68,30 @@ int sys_open(char *filename, int flag, int retfd) {
 *3) initialize offset in openfile
 return the file descriptor of the openfile item
 */
-#if OPT_LAB5
+#if OPT_FILE
 	struct proc *proc = curproc; 
 	struct openfile *openfile_item; /*create an openfile item*/
 	int err; /*return value of vfs_open*/
 	int openflags;
 	mode_t mode; /*boh*/
+	int fd; /*file descriptor --> return value*/
 	/*vfs_open prototype: int vfs_open(char *path, int openflags, mode_t mode, struct vnode **ret)*/
-	err = vfs_open(filename, openflags, mode, &openfile_item->vnode); /*obtain vnode from vfs_open()*/
+	err = vfs_open(filename, openflags, mode, &openfile_item->vn); /*obtain vnode from vfs_open()*/
 	openfile_item->offset = 0; /*initialize offset in openfile*/
 	
 	/*we have to place openfile in systemFileTable*/
 	
 #else
-	return 0;
+	return -1; /*non ritorno 0 perchè la sys_open deve ritornare il fd e 0 sarebbe stdin*/
 #endif
 	
 }
 
 int sys_close(int fd) {
-#if OPT_LAB5
+#if OPT_FILE
 
 #else
-	return 0;
+	return -1;
 #endif
 }
 

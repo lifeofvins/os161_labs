@@ -462,3 +462,8 @@ defoption waitpid
 defoption fork
 optfile waitpid syscall/proc_syscalls.c
 optfile fork syscall/proc_syscalls.c
+
+
+#DEFINISCO OPZIONI PER LAB5 (FILE)
+defoption file
+optfile file syscall/file_syscalls.c
