@@ -186,6 +186,11 @@ proc_create(const char *name)
 #if OPT_FILE
 	/*create per process fileTable*/
 	proc->perProcessFileTable = create_fileTable();
+	
+	/*cabodi*/
+	/*
+	bzero(proc->fileTable, OPEN_MAX*sizeof(struct openfile *));
+	*/
 #endif
 
 	return proc;
@@ -462,4 +467,36 @@ proc_wait(struct proc *proc)
         return 0;
 #endif
 }
+
+
+/*cabodi*/
+void 
+proc_signal_end(struct proc *proc) {
+
+#if USE_SEMAPHORE_FOR_WAITPID
+	V(proc->p_sem);
+#else
+	lock_acquire(proc->p_lock);
+	cv_signal(proc->p_cv);
+	lock_release(proc->p_lock);
+#endif 
+}
+
+/*cabodi lab 05*/
+
+/*#if OPT_FILE
+void 
+proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
+  int fd;
+  for (fd=0; fd<OPEN_MAX; fd++) {
+    struct openfile *of = psrc->fileTable[fd];
+    pdest->fileTable[fd] = of;
+    if (of != NULL) {
+      openfileIncrRefCount(of); //increment reference count
+    }
+  }
+}
+
+#endif
+*/
 
