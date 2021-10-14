@@ -8,9 +8,8 @@ main.o: ../../main/main.c ../../include/types.h \
  ../../include/hangman.h opt-hangman.h includelinks/machine/spinlock.h \
  ../../include/threadlist.h includelinks/machine/thread.h \
  ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
- ../../include/proc.h opt-waitpid.h ../../include/filetable.h \
- ../../include/synch.h opt-synch.h ../../include/vnode.h \
- ../../include/current.h includelinks/machine/current.h \
+ ../../include/proc.h opt-waitpid.h opt-file.h ../../include/current.h \
+ includelinks/machine/current.h ../../include/synch.h opt-synch.h \
  ../../include/vm.h includelinks/machine/vm.h ../../include/mainbus.h \
  ../../include/vfs.h ../../include/device.h ../../include/syscall.h \
  opt-syscalls.h opt-fork.h ../../include/test.h ../../include/version.h \

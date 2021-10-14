@@ -37,12 +37,11 @@
  */
 
 #include <spinlock.h>
+#include <limits.h>
+#include <current.h>
 #include "opt-waitpid.h"
 #include "opt-file.h"
 
-#include <filetable.h>
-
-#define OPEN_MAX 50
 
 struct addrspace;
 struct thread;
@@ -98,10 +97,8 @@ struct proc {
 #endif
 
 #if OPT_FILE
-	struct fileTable *perProcessFileTable;
-	
 	/*cabodi*/
-	//struct openfile *fileTable[OPEN_MAX];
+	struct openfile *fileTable[OPEN_MAX];
 
 #endif
 };
@@ -135,11 +132,11 @@ int proc_wait(struct proc *proc);
 /* get proc from pid */
 struct proc *proc_search_pid(pid_t pid);
 
-
+/* signal end/exit of process */
+void proc_signal_end(struct proc *proc);
 /*cabodi*/
-/*
 #if OPT_FILE
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
-*/
+
 #endif /* _PROC_H_ */

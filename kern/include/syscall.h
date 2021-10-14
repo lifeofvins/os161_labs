@@ -64,29 +64,20 @@ int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 #if OPT_SYSCALLS
 #if OPT_FILE
-/*cabodi*/
-/*
 struct openfile;
 void openfileIncrRefCount(struct openfile *of);
 int sys_open(userptr_t path, int openflags, mode_t mode, int *errp);
 int sys_close(int fd);
-*/
-int sys_write(int fd, userptr_t buf_ptr, size_t size);
-int sys_read(int fd, userptr_t buf_ptr, size_t size, int *retval);
 #endif
-
-
+int sys_write(int fd, userptr_t buf_ptr, size_t size);
+int sys_read(int fd, userptr_t buf_ptr, size_t size);
 void sys__exit(int status);
 int sys_waitpid(pid_t pid, userptr_t statusp, int options);
 pid_t sys_getpid(void);
 #if OPT_FORK
 int sys_fork(struct trapframe *ctf, pid_t *retval);
 #endif
-#endif /*OPT_SYSCALLS*/
 
-/*LAB05*/
-int sys_open(char *filename, int flag, int retfd);
-int sys_close(int fd);
-
+#endif
 
 #endif /* _SYSCALL_H_ */

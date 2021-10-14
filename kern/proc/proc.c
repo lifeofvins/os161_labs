@@ -48,9 +48,7 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-
-/*per lab05*/
-#include <filetable.h>
+#include <syscall.h>
 
 #if OPT_WAITPID
 #include <synch.h>
@@ -185,12 +183,10 @@ proc_create(const char *name)
 	proc_init_waitpid(proc,name);
 #if OPT_FILE
 	/*create per process fileTable*/
-	proc->perProcessFileTable = create_fileTable();
-	
 	/*cabodi*/
-	/*
+	
 	bzero(proc->fileTable, OPEN_MAX*sizeof(struct openfile *));
-	*/
+	
 #endif
 
 	return proc;
@@ -484,7 +480,7 @@ proc_signal_end(struct proc *proc) {
 
 /*cabodi lab 05*/
 
-/*#if OPT_FILE
+#if OPT_FILE
 void 
 proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
   int fd;
@@ -498,5 +494,5 @@ proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
 }
 
 #endif
-*/
+
 
