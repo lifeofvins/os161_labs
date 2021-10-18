@@ -79,6 +79,7 @@ sys_getpid(void)
 }
 
 #if OPT_FORK
+/*this is the child's fork entry function*/
 static void
 call_enter_forked_process(void *tfv, unsigned long dummy) {
   struct trapframe *tf = (struct trapframe *)tfv;
@@ -89,7 +90,8 @@ call_enter_forked_process(void *tfv, unsigned long dummy) {
 }
 
 int sys_fork(struct trapframe *ctf, pid_t *retval) {
-  struct trapframe *tf_child;
+  struct trapframe *tf_child; /*copy parent's trapframe and pass it to child thread
+  			       */
   struct proc *newp;
   int result;
 
@@ -102,10 +104,14 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 
   /* done here as we need to duplicate the address space 
      of thbe current process */
+     /*as_copy(struct addrspace *old, struct addrspace **ret) definita in arch/mips/vm/dumbvm.c*/
   as_copy(curproc->p_addrspace, &(newp->p_addrspace));
   if(newp->p_addrspace == NULL){
     proc_destroy(newp); 
-    return ENOMEM; 
+    return ENOMEM; /*out of memory: a memory allocation failed. This normally means that
+    		    *a process has used up all the memory available to it. 
+    		    *it may also mean that memory allocation within the kernel has failed.
+    		    */
   }
 
   /* we need a copy of the parent's trapframe */
@@ -114,10 +120,13 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     proc_destroy(newp);
     return ENOMEM; 
   }
-  memcpy(tf_child, ctf, sizeof(struct trapframe));
+  memcpy(tf_child, ctf, sizeof(struct trapframe)); /*copy parent's trapframe
+						    *and pass it to the child thread
+						    */
 
   /* TO BE DONE: linking parent/child, so that child terminated 
      on parent exit */
+
 
   result = thread_fork(
 		 curthread->t_name, newp,
@@ -130,6 +139,9 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     return ENOMEM;
   }
 
+  /*after calling thread_fork, just copy the entire filetable to the child (parent)*/
+  /*copy parent's filetable into child) PROGETTO PDS*/
+  proc_file_table_copy(curproc, newp); 
   *retval = newp->p_pid;
 
   return 0;
