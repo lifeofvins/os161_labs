@@ -531,6 +531,9 @@ thread_fork(const char *name,
 	newthread->t_cpu = curthread->t_cpu;
 
 	/* Attach the new thread to its process */
+	
+/*copy parent's filetable into child) PROGETTO PDS*/
+	proc_file_table_copy(curproc, newp); 
 	if (proc == NULL) {
 		proc = curthread->t_proc;
 	}
