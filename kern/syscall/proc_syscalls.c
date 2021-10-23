@@ -141,10 +141,6 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     return ENOMEM;
   }
   
-  
-  /*******************PARENT CODE***********************************************/
-  /*after calling thread_fork, just copy the entire filetable to the child (parent)*/
-  /*copy parent's filetable into child) PROGETTO PDS*/
   proc_file_table_copy(curproc, newp); 
   
   *retval = newp->p_pid; /*parent returns with child's pid immediately*/
