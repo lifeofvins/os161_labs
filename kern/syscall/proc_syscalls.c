@@ -90,9 +90,8 @@ call_enter_forked_process(void *tfv, unsigned long dummy) {
 }
 
 int sys_fork(struct trapframe *ctf, pid_t *retval) {
-  struct trapframe *tf_child; /*copy parent's trapframe and pass it to child thread
-  			       */
-  struct proc *newp;
+  struct trapframe *tf_child;
+  struct proc *newp; /*child process*/
   int result;
 
   KASSERT(curproc != NULL);
@@ -102,28 +101,29 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     return ENOMEM;
   }
 
-  /* done here as we need to duplicate the address space 
-     of thbe current process */
-     /*as_copy(struct addrspace *old, struct addrspace **ret) definita in arch/mips/vm/dumbvm.c*/
-  as_copy(curproc->p_addrspace, &(newp->p_addrspace));
+  tf_child = kmalloc(sizeof(struct trapframe)); /*allocation*/
+  if(tf_child == NULL){
+    proc_destroy(newp);
+    return ENOMEM; 
+  }
+  
+  /*first of all we have to copy parent's trap frame and pass it to child thread*/
+  memcpy(tf_child, ctf, sizeof(struct trapframe)); 
+  
+  /*then we have to copy parent's address space*/
+    as_copy(curproc->p_addrspace, &(newp->p_addrspace));
   if(newp->p_addrspace == NULL){
     proc_destroy(newp); 
     return ENOMEM; /*out of memory: a memory allocation failed. This normally means that
     		    *a process has used up all the memory available to it. 
     		    *it may also mean that memory allocation within the kernel has failed.
     		    */
-  }
-
-  /* we need a copy of the parent's trapframe */
-  tf_child = kmalloc(sizeof(struct trapframe));
-  if(tf_child == NULL){
-    proc_destroy(newp);
-    return ENOMEM; 
-  }
-  memcpy(tf_child, ctf, sizeof(struct trapframe)); /*copy parent's trapframe
-						    *and pass it to the child thread
-						    */
-
+  }	
+  
+  call_enter_forked_process((void *)tf_child, 0); /*pass the trapframe pointer to child's fork entry function*/
+  /* done here as we need to duplicate the address space 
+     of thbe current process */
+     /*as_copy(struct addrspace *old, struct addrspace **ret) definita in arch/mips/vm/dumbvm.c*/
   /* TO BE DONE: linking parent/child, so that child terminated 
      on parent exit */
 
@@ -138,12 +138,20 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     kfree(tf_child);
     return ENOMEM;
   }
-
+  
+  
+  /*******************PARENT CODE***********************************************/
   /*after calling thread_fork, just copy the entire filetable to the child (parent)*/
   /*copy parent's filetable into child) PROGETTO PDS*/
   proc_file_table_copy(curproc, newp); 
-  *retval = newp->p_pid;
-
+  
+  *retval = newp->p_pid; /*parent returns with child's pid immediately*/
+  
+  
+  
+  
+  
+  /**********************CHILD CODE**************************************/
   return 0;
 }
 #endif
