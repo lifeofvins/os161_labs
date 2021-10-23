@@ -221,10 +221,6 @@ enter_forked_process(struct trapframe *tf)
 
 	forkedTf.tf_epc += 4; // return to next instruction
 	
-/*grace: progetto*/
-/*we need to load the address space into child's curthread->t_addrspace 
-*and activate it using as_activate*/
-
 	as_activate();
 
 

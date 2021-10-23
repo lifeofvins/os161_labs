@@ -189,6 +189,7 @@ proc_create(const char *name)
 	
 #endif
 
+
 	return proc;
 }
 
@@ -278,6 +279,7 @@ proc_destroy(struct proc *proc)
 	proc_end_waitpid(proc);
 
 	kfree(proc->p_name);
+
 	kfree(proc);
 }
 
