@@ -310,7 +310,7 @@ proc_create_runprogram(const char *name)
 {
 	struct proc *newproc;
 
-	newproc = proc_create(name);
+	newproc = proc_create(name); /*alloca la struttura dati del nuovo processo*/
 	if (newproc == NULL) {
 		return NULL;
 	}
