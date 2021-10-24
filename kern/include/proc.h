@@ -41,7 +41,7 @@
 #include <current.h>
 #include "opt-waitpid.h"
 #include "opt-file.h"
-
+#include "opt-fork.h"
 #include <array.h>
 
 struct addrspace;
@@ -104,10 +104,10 @@ struct proc {
 #endif
 
 /*non funziona se metto #if oPT_FORK*/
-
+#if OPT_FORK
 	struct proc *p_parent; /*puntatore al padre*/
 	struct array *p_children; /*array dei figli*/
-
+#endif
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
@@ -146,8 +146,8 @@ void proc_signal_end(struct proc *proc);
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
 
-//#if OPT_FORK
+#if OPT_FORK
 void proc_add_child(struct proc *parent, struct proc *child);
-//#endif
+#endif
 
 #endif /* _PROC_H_ */

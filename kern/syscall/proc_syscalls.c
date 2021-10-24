@@ -91,6 +91,8 @@ call_enter_forked_process(void *tfv, unsigned long dummy) {
   panic("enter_forked_process returned (should not happen)\n");
 }
 
+
+/*nella sys_fork entra solo il padre*/
 int sys_fork(struct trapframe *ctf, pid_t *retval) {
   struct trapframe *tf_child;
   struct proc *newp;
@@ -125,11 +127,10 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   }	
   
 
-  /* TO BE DONE: linking parent/child, so that child terminated 
+  /*linking parent/child, so that child terminated 
      on parent exit */
-
   newp->p_parent = parent; /*il figlio punta al padre*/
-  
+  proc_add_child(parent, newp);
   /*aggiungo il figlio alla lista dei processi figli del padre*/
   /*qui fa partire il figlio*/
   result = thread_fork(
@@ -144,14 +145,12 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   }
   
 
-  
+ 
   *retval = newp->p_pid; /*parent returns with child's pid immediately*/
   
+ 
+  /*la fork ritorna il pid del figlio se sono nel padre, zero se sono nel figlio*/
   
-  
-  
-  
-  /**********************CHILD CODE**************************************/
   return 0;
 }
 #endif /*OPT_FORK*/

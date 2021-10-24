@@ -193,9 +193,10 @@ proc_create(const char *name)
 	
 #endif
 
+#if OPT_FORK
 	proc->p_parent = NULL;
 	proc->p_children = array_create(); /*alloco/inizializzo l'array di figli*/
-
+#endif
 
 	return proc;
 }
@@ -289,7 +290,8 @@ proc_destroy(struct proc *proc)
 	
 #if OPT_FORK
 	unsigned	 i; /*indice del for per svuotare l'array di figli*/
-	unsigned dim; /*salvo la dimensione dell'array dei figli*/
+	volatile unsigned dim; /*salvo la dimensione dell'array dei figli*/
+	volatile struct proc *arr_debug;
 	if (proc->p_parent != NULL)
 		proc->p_parent = NULL;
 	
@@ -298,11 +300,19 @@ proc_destroy(struct proc *proc)
 		/*ha dei figli*/
 		dim = proc->p_children->num;
 		for (i = 0; i < dim; i++) {
-			array_remove(proc->p_children, i);
+			arr_debug = (struct proc *)array_get(proc->p_children, 0);
+			KASSERT(arr_debug != NULL);
+			array_remove(proc->p_children, 0);
 		}
 	}
+	
 	/*se il processo non ha figli ha già l'array dei figli vuoto*/
-	array_cleanup(proc->p_children); /*l'array deve essere vuoto*/
+	
+	array_destroy(proc->p_children); /*l'array deve essere vuoto*/
+	
+	/*metto a NULL*/
+	proc->p_children = NULL;
+	KASSERT(proc->p_children == NULL);
 #endif
 	kfree(proc);
 }
@@ -528,7 +538,7 @@ proc_add_child(struct proc *parent, struct proc *child) {
 	KASSERT (parent != NULL);
 	KASSERT (child != NULL);
 	unsigned index_ret = (unsigned)child->p_pid;
-	array_add(parent->p_children, (void *)child, &index_ret);
+	array_add(parent->p_children, (void *)child, &index_ret); /*potrei avere un errore*/
 }
 #endif
 
