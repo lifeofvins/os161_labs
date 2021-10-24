@@ -129,6 +129,8 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
      on parent exit */
 
   newp->p_parent = parent; /*il figlio punta al padre*/
+  
+  /*aggiungo il figlio alla lista dei processi figli del padre*/
   /*qui fa partire il figlio*/
   result = thread_fork(
 		 curthread->t_name, newp,

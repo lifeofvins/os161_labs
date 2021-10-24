@@ -146,4 +146,8 @@ void proc_signal_end(struct proc *proc);
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
 
+#if OPT_FORK
+void proc_add_child(struct proc *parent, struct proc *child);
+#endif
+
 #endif /* _PROC_H_ */

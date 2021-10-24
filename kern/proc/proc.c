@@ -50,6 +50,10 @@
 #include <vnode.h>
 #include <syscall.h>
 
+#if OPT_FORK
+#include <array.h>
+#endif
+
 #if OPT_WAITPID
 #include <synch.h>
 
@@ -282,7 +286,24 @@ proc_destroy(struct proc *proc)
 	proc_end_waitpid(proc);
 
 	kfree(proc->p_name);
-
+	
+#if OPT_FORK
+	unsigned	 i; /*indice del for per svuotare l'array di figli*/
+	unsigned dim; /*salvo la dimensione dell'array dei figli*/
+	if (proc->p_parent != NULL)
+		proc->p_parent = NULL;
+	
+	/*rimuovo anche tutti i figli del processo, se ce li ha*/
+	if (proc->p_children->num > 0) {
+		/*ha dei figli*/
+		dim = proc->p_children->num;
+		for (i = 0; i < dim; i++) {
+			array_remove(proc->p_children, i);
+		}
+	}
+	/*se il processo non ha figli ha già l'array dei figli vuoto*/
+	array_cleanup(proc->p_children); /*l'array deve essere vuoto*/
+#endif
 	kfree(proc);
 }
 
@@ -500,5 +521,14 @@ proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
 
 #endif
 
+#if OPT_FORK
+void 
+proc_add_child(struct proc *parent, struct proc *child) {
 
+	KASSERT (parent != NULL);
+	KASSERT (child != NULL);
+	unsigned index_ret = (unsigned)child->p_pid;
+	array_add(parent->p_children, (void *)child, &index_ret);
+}
+#endif
 
