@@ -75,7 +75,7 @@ struct vnode;
 
 struct proc {
 	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
+	struct spinlock p_spinlock;		/* Lock for this structure */
 	unsigned p_numthreads;		/* Number of threads in this process */
 
 	/* VM */
