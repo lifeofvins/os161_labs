@@ -509,7 +509,9 @@ thread_fork(const char *name,
 {
 	struct thread *newthread;
 	int result;
-
+	
+	struct proc *parent = curproc; /*per debug*/
+	KASSERT (proc != NULL);
 	newthread = thread_create(name); /*creates the data structure*/
 	if (newthread == NULL) {
 		return ENOMEM;
@@ -553,6 +555,7 @@ thread_fork(const char *name,
 	switchframe_init(newthread, entrypoint, data1, data2);
 
 	/* Lock the current cpu's run queue and make the new thread runnable */
+	proc_file_table_copy(parent, proc);
 	thread_make_runnable(newthread, false);
 
 	return 0;

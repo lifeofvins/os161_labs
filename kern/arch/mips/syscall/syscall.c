@@ -221,6 +221,9 @@ enter_forked_process(struct trapframe *tf)
 
 	forkedTf.tf_epc += 4; // return to next instruction
 	
+
+	
+	/*activate the addrspace*/
 	as_activate();
 
 

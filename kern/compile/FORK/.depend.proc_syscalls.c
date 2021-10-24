@@ -14,4 +14,4 @@ proc_syscalls.o: ../../syscall/proc_syscalls.c ../../include/types.h \
  includelinks/kern/machine/setjmp.h opt-waitpid.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h includelinks/mips/trapframe.h ../../include/synch.h \
- opt-synch.h
+ opt-synch.h ../../include/spl.h

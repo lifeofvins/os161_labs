@@ -18,6 +18,8 @@
 #include <mips/trapframe.h>
 #include <current.h>
 #include <synch.h>
+#include <spl.h>
+
 
 /*
  * system calls for process management
@@ -120,16 +122,14 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     		    */
   }	
   
-  call_enter_forked_process((void *)tf_child, 0); /*pass the trapframe pointer to child's fork entry function*/
-  /* done here as we need to duplicate the address space 
-     of thbe current process */
-     /*as_copy(struct addrspace *old, struct addrspace **ret) definita in arch/mips/vm/dumbvm.c*/
-				   
 
   /* TO BE DONE: linking parent/child, so that child terminated 
      on parent exit */
 
-
+  //proc_file_table_copy(curproc, newp); 
+  
+  /*synchro issue*/
+  /*qui fa partire il figlio*/
   result = thread_fork(
 		 curthread->t_name, newp,
 		 call_enter_forked_process, 
@@ -141,7 +141,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
     return ENOMEM;
   }
   
-  proc_file_table_copy(curproc, newp); 
+
   
   *retval = newp->p_pid; /*parent returns with child's pid immediately*/
   
