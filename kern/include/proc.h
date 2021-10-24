@@ -42,6 +42,7 @@
 #include "opt-waitpid.h"
 #include "opt-file.h"
 
+#include <array.h>
 
 struct addrspace;
 struct thread;
@@ -101,6 +102,11 @@ struct proc {
 	struct openfile *fileTable[OPEN_MAX];
 
 #endif
+
+/*non funziona se metto #if oPT_FORK*/
+
+	struct proc *p_parent; /*puntatore al padre*/
+	struct array *p_children; /*array dei figli*/
 
 };
 

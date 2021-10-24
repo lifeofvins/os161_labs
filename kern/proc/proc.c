@@ -189,6 +189,9 @@ proc_create(const char *name)
 	
 #endif
 
+	proc->p_parent = NULL;
+	proc->p_children = array_create(); /*alloco/inizializzo l'array di figli*/
+
 
 	return proc;
 }
@@ -497,4 +500,11 @@ proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
 
 #endif
 
+
+/*#if OPT_FORK
+void 
+proc_add_child(struct proc *parent, struct array *children) {
+
+}
+#endif*/
 

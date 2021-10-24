@@ -96,9 +96,11 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   struct proc *newp;
   int result;
 
-  KASSERT(curproc != NULL);
+  KASSERT(curproc != NULL); /*curproc sarebbe il padre*/
+  
+  struct proc *parent = curproc;
 
-  newp = proc_create_runprogram(curproc->p_name);
+  newp = proc_create_runprogram(parent->p_name);
   if (newp == NULL) {
     return ENOMEM;
   }
@@ -126,9 +128,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   /* TO BE DONE: linking parent/child, so that child terminated 
      on parent exit */
 
-  //proc_file_table_copy(curproc, newp); 
-  
-  /*synchro issue*/
+  newp->p_parent = parent; /*il figlio punta al padre*/
   /*qui fa partire il figlio*/
   result = thread_fork(
 		 curthread->t_name, newp,
@@ -152,4 +152,4 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   /**********************CHILD CODE**************************************/
   return 0;
 }
-#endif
+#endif /*OPT_FORK*/
