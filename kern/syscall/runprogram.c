@@ -44,21 +44,29 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
-
+#include <copyinout.h>
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
  *
  * Calls vfs_open on progname and thus may destroy it.
  */
+ 
+/*progetto pds: ho aggiunto nargs e ptr come parametri*/
 int
-runprogram(char *progname)
+runprogram(char *progname, unsigned long nargs)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
-
+	//int err; /*risultato di copyout*/
+	
+	//userptr_t user_addr = NULL;
+	//char **args = ptr; /*faccio cast perchè copyout vuole come parametro src un const char*/
+	//size_t length = strlen(progname);
+	//size_t actual; /*boh non so a che serve*/
+	
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 	if (result) {
@@ -96,9 +104,19 @@ runprogram(char *progname)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
-
+	
+	/*per passare dal ptr void a userspace addr of argv da passare a enter_new_process
+	devo usare copyout*/
+	
+	/*copio da kernel address a user address*/
+	
+	
+	/*per far tornare a funzionare forktest devo commentare sta roba*/
+	//err = copyoutstr(progname, user_addr, length, &actual);
+	//KASSERT (user_addr != NULL);
+	//KASSERT (err == 0);
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(nargs /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 

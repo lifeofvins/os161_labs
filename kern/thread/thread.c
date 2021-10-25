@@ -555,12 +555,13 @@ thread_fork(const char *name,
 	switchframe_init(newthread, entrypoint, data1, data2);
 
 	/* Lock the current cpu's run queue and make the new thread runnable */
-	
+#if OPT_FORK
 	/*copio la fileTable del padre subito prima di rendere runnable il thread*/
 	
 	spinlock_acquire(&parent->p_spinlock); /*buh lo faccio in mutua esclusione*/
 	proc_file_table_copy(parent, proc);
 	spinlock_release(&parent->p_spinlock);
+#endif
 	thread_make_runnable(newthread, false);
 
 	return 0;

@@ -8,7 +8,7 @@ runprogram.o: ../../syscall/runprogram.c ../../include/types.h \
  ../../include/current.h includelinks/machine/current.h \
  ../../include/thread.h ../../include/array.h ../../include/threadlist.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h opt-waitpid.h opt-file.h \
+ includelinks/kern/machine/setjmp.h opt-waitpid.h opt-file.h opt-fork.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h ../../include/vfs.h ../../include/syscall.h opt-syscalls.h \
- opt-fork.h ../../include/test.h
+ ../../include/test.h
