@@ -60,13 +60,7 @@ runprogram(char *progname, unsigned long nargs)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
-	//int err; /*risultato di copyout*/
-	
-	//userptr_t user_addr = NULL;
-	//char **args = ptr; /*faccio cast perchè copyout vuole come parametro src un const char*/
-	//size_t length = strlen(progname);
-	//size_t actual; /*boh non so a che serve*/
-	
+
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 	if (result) {
@@ -111,11 +105,10 @@ runprogram(char *progname, unsigned long nargs)
 	/*copio da kernel address a user address*/
 	
 	
-	/*per far tornare a funzionare forktest devo commentare sta roba*/
-	//err = copyoutstr(progname, user_addr, length, &actual);
-	//KASSERT (user_addr != NULL);
-	//KASSERT (err == 0);
+	
 	/* Warp to user mode. */
+	
+
 	enter_new_process(nargs /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);

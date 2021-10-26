@@ -11,4 +11,4 @@ runprogram.o: ../../syscall/runprogram.c ../../include/types.h \
  includelinks/kern/machine/setjmp.h opt-waitpid.h opt-file.h opt-fork.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h ../../include/vfs.h ../../include/syscall.h opt-syscalls.h \
- ../../include/test.h
+ ../../include/test.h ../../include/copyinout.h

@@ -77,7 +77,6 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	char progname[128];
 	int result;
 	
-	//int len;
 	
 	KASSERT(nargs >= 1);
 
@@ -89,9 +88,7 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	KASSERT(strlen(args[0]) < sizeof(progname));
 
 	strcpy(progname, args[0]);
-	/*mi salvo la lunghezza di progname e la passo poi a runprogram*/
-	//len = strlen(progname);
-	
+
 	result = runprogram(progname, nargs); /*passo a runprogram il nome del programma,
 						   il numero di argomenti e il puntatore void al
 						   vettore di argomenti*/
