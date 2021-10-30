@@ -40,6 +40,10 @@
 #include <spinlock.h>
 #include <threadlist.h>
 
+#if OPT_EXECV
+#include <addrspace.h>
+#endif
+
 struct cpu;
 
 /* get machine-dependent defs */
@@ -107,6 +111,9 @@ struct thread {
 	 */
 
 	/* add more here as needed */
+#if OPT_EXECV
+	struct addrspace *t_vmspace;
+#endif
 };
 
 /*

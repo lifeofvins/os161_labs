@@ -99,12 +99,6 @@ runprogram(char *progname, unsigned long nargs)
 		return result;
 	}
 	
-	/*per passare dal ptr void a userspace addr of argv da passare a enter_new_process
-	devo usare copyout*/
-	
-	/*copio da kernel address a user address*/
-	
-	
 	
 	/* Warp to user mode. */
 	

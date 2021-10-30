@@ -8,6 +8,7 @@
 #include <types.h>
 #include <kern/unistd.h>
 #include <kern/errno.h>
+#include <kern/fcntl.h>
 #include <clock.h>
 #include <copyinout.h>
 #include <syscall.h>
@@ -19,8 +20,9 @@
 #include <current.h>
 #include <synch.h>
 #include <spl.h>
-
-
+#include <vnode.h>
+#include <vfs.h>
+#include <test.h>
 /*
  * system calls for process management
  */
@@ -154,3 +156,118 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   return 0;
 }
 #endif /*OPT_FORK*/
+
+#if OPT_EXECV
+int sys_execv(char *program, char **args) {
+	
+	//struct addrspace *as;
+	//struct addrspace *as_user;
+	//struct addrspace *as_kernel;
+	struct vnode *v;
+	vaddr_t entrypoint, stackptr;
+	int result;
+	size_t dim_args, len;
+	int i;
+	
+	/*strutture kernel*/
+	char *kprogram;
+	char **kargs;
+	
+	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
+	if (program == NULL || args == NULL) {
+		return EFAULT;
+	}
+	
+	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
+	for (dim_args = 0; args[dim_args] != NULL; dim_args++);
+	
+	/*alloco il vettore*/
+	kargs = (char **)kmalloc(dim_args * sizeof(char**));
+	if (kargs == NULL) {
+		/*TODO: libera memoria*/
+		return ENOMEM;
+	}
+	
+	/*alloco ogni riga del vettore*/
+	for (i = 0; i < (int)dim_args; i++) {
+		len = strlen(args[i]) + 1;
+		kargs[i] = kmalloc(len); /*con terminatore di stringa*/
+		if (kargs[i] == NULL) {
+			/*TODO: libera memoria*/
+			return ENOMEM;
+		}
+		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
+		result = copyin((const_userptr_t)args[i], (void *)kargs[i], len);
+		if (result) {
+			/*TODO: libera memoria*/
+			return -result;
+		}
+	}
+	
+	/*faccio la stessa cosa col nome del programma*/
+	len = strlen(program) + 1;
+	kprogram = kmalloc(len);
+	if (kprogram == NULL) {
+		/*TODO: libera memoria*/
+		return ENOMEM;
+	}
+	result = copyin((const_userptr_t)program, (void *)kprogram, len);
+	if (result) {
+		/*TODO: libera memoria*/
+		return -result;
+	}
+	
+	/*non mi serve più l'address space user, passo a quello di kernel*/
+	
+	/*t_vmspace lo devo aggiungere io(?)*/
+	as_destroy(curthread->t_vmspace); /* old addrspace is no longer needed */
+
+	curthread->t_vmspace = as_create(); //ricrea l'as
+	if (curthread->t_vmspace==NULL) {
+		return ENOMEM;
+	}
+	
+	/* Open the file. */
+	result = vfs_open(kprogram, O_RDONLY, 0, &v);
+	if (result) {
+		return -result;
+	}
+	/* Switch to it and activate it. */
+	proc_setas(curthread->t_vmspace);
+	as_activate();
+
+	/* Load the executable. */
+	result = load_elf(v, &entrypoint);
+	if (result) {
+		/*TODO: libera memoria*/
+		/* p_addrspace will go away when curproc is destroyed */
+		vfs_close(v);
+		return result;
+	}
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+	/* Define the user stack in the address space */
+	result = as_define_stack(curthread->t_vmspace, &stackptr);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return -result;
+	}
+	
+	
+	/* Warp to user mode. */
+	
+
+	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+			  NULL /*userspace addr of environment*/,
+			  stackptr, entrypoint);
+
+	/* enter_new_process does not return. */
+	panic("enter_new_process returned\n");
+	return EINVAL;
+	
+	
+	return 0;
+}
+#endif
