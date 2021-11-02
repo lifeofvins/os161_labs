@@ -106,6 +106,7 @@ main(void)
 	cat();
 
 	waitall();
+	
 
 	return 0;
 }

@@ -150,7 +150,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 
  
   *retval = newp->p_pid; /*parent returns with child's pid immediately*/
-  
+  //newp->p_pid = 0; /*child has pid = 0*/
  
   /*la fork ritorna il pid del figlio se sono nel padre, zero se sono nel figlio*/
   
@@ -173,6 +173,7 @@ int sys_execv(char *program, char **args) {
 	/*strutture kernel*/
 	char *kprogram;
 	char **kargs;
+	
 	
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
 	if (program == NULL || args == NULL) {
@@ -205,6 +206,8 @@ int sys_execv(char *program, char **args) {
 			/*TODO: libera memoria*/
 			return -result;
 		}
+		/*debug*/
+		kprintf("kargs[%d] = %s\n", i, kargs[i]);
 	}
 	as_prova = curproc->p_addrspace;
 	
@@ -220,6 +223,8 @@ int sys_execv(char *program, char **args) {
 		/*TODO: libera memoria*/
 		return -result;
 	}
+	/*debug*/
+	kprintf("kprogram = %s\n", kprogram);
 	
 	/*non mi serve più l'address space user, passo a quello di kernel*/
 	
@@ -260,8 +265,38 @@ int sys_execv(char *program, char **args) {
 		return -result;
 	}
 	
+	/*devo tornare da kernel a user*/
+	/*strutture user dopo kernel*/
+	char **uargs;
+	unsigned int cpaddr;
+	int length, tail;
 	
-	/*TODO: copyout*/
+	//userptr_t args_out_addr;
+	uargs = (char **)kmalloc(sizeof(char *) * (dim_args + 1));
+	if (uargs == NULL) {
+		/*TODO: free*/
+		return ENOMEM;
+	}
+	cpaddr = stackptr;
+	for (i = 0; i < (int)dim_args; i++) {
+		length = strlen(kargs[i])+1;
+		cpaddr -= length;
+		tail = 0;
+		if (cpaddr & 0x3) {
+			tail = cpaddr & 0x3;
+			cpaddr -= tail;
+		}
+		copyout((const void *)kargs[i], (userptr_t)cpaddr, length); /*copio da kernel a user*/
+		kargs[i] = NULL;
+		cpaddr -= sizeof(char *)*(i+1); /*sposto lo stack di un offset pari al
+						numero di stringhe che ha messo in kargs[]*/
+		
+		copyout((const void *)uargs, (userptr_t)cpaddr, sizeof(char *)*(i+1));
+		
+		/*TODO: free all*/
+	}
+	
+	
 	/* Warp to user mode. */
 	
 
@@ -273,6 +308,7 @@ int sys_execv(char *program, char **args) {
 	panic("enter_new_process returned\n");
 	return EINVAL;
 	
+	kprintf("YAAAAAAAAAAAAAAAAAAY\n");
 	
 	return 0;
 }
