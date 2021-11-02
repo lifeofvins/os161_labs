@@ -144,6 +144,8 @@ mips_trap(struct trapframe *tf)
 	KASSERT(code < NTRAPCODES);
 
 	/* Make sure we haven't run off our stack */
+	struct thread *thread = curthread;
+	KASSERT(thread != NULL);
 	if (curthread != NULL && curthread->t_stack != NULL) {
 		KASSERT((vaddr_t)tf > (vaddr_t)curthread->t_stack);
 		KASSERT((vaddr_t)tf < (vaddr_t)(curthread->t_stack

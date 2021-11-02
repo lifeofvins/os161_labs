@@ -151,6 +151,10 @@ thread_create(const char *name)
 	thread->t_iplhigh_count = 1; /* corresponding to t_curspl */
 
 	/* If you add to struct thread, be sure to initialize here */
+	
+#if OPT_EXECV
+	thread->t_as = NULL;
+#endif
 
 	return thread;
 }
@@ -284,6 +288,23 @@ thread_destroy(struct thread *thread)
 	if (thread->t_stack != NULL) {
 		kfree(thread->t_stack);
 	}
+	
+	
+#if OPT_EXECV
+	/*VM fields*/
+	if (thread->t_as) {
+		struct addrspace *as;
+		if (thread == curthread) {
+			as = proc_setas(NULL);
+			as_deactivate();
+		}
+		else {
+			as = thread->t_as;
+			thread->t_as = NULL;
+		}
+		as_destroy(as);
+	}
+#endif
 	threadlistnode_cleanup(&thread->t_listnode);
 	thread_machdep_cleanup(&thread->t_machdep);
 

@@ -112,7 +112,7 @@ struct thread {
 
 	/* add more here as needed */
 #if OPT_EXECV
-	struct addrspace *t_vmspace;
+	struct addrspace *t_as;
 #endif
 };
 

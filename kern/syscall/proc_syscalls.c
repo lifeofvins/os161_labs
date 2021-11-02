@@ -103,7 +103,8 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   KASSERT(curproc != NULL); /*curproc sarebbe il padre*/
   
   struct proc *parent = curproc;
-
+  struct thread *thread = curthread;
+  KASSERT(thread != NULL);
   newp = proc_create_runprogram(parent->p_name);
   if (newp == NULL) {
     return ENOMEM;
@@ -160,7 +161,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 #if OPT_EXECV
 int sys_execv(char *program, char **args) {
 	
-	//struct addrspace *as;
+	struct addrspace *as_prova;
 	//struct addrspace *as_user;
 	//struct addrspace *as_kernel;
 	struct vnode *v;
@@ -179,6 +180,8 @@ int sys_execv(char *program, char **args) {
 	}
 	
 	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
+	char *prova = args[0];
+	KASSERT (prova != NULL);
 	for (dim_args = 0; args[dim_args] != NULL; dim_args++);
 	
 	/*alloco il vettore*/
@@ -203,6 +206,7 @@ int sys_execv(char *program, char **args) {
 			return -result;
 		}
 	}
+	as_prova = curproc->p_addrspace;
 	
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
@@ -219,21 +223,22 @@ int sys_execv(char *program, char **args) {
 	
 	/*non mi serve più l'address space user, passo a quello di kernel*/
 	
-	/*t_vmspace lo devo aggiungere io(?)*/
-	as_destroy(curthread->t_vmspace); /* old addrspace is no longer needed */
-
-	curthread->t_vmspace = as_create(); //ricrea l'as
-	if (curthread->t_vmspace==NULL) {
+	/*t_as lo devo aggiungere io(?)*/
+	as_destroy(curproc->p_addrspace); /* old addrspace is no longer needed */
+	//as_prova = curproc->p_addrspace;
+	curproc->p_addrspace = as_create(); //ricrea l'as
+	if (curproc->p_addrspace==NULL) {
 		return ENOMEM;
 	}
-	
+	//as_prova = curproc->p_addrspace;
+	KASSERT(as_prova != NULL);
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
 		return -result;
 	}
 	/* Switch to it and activate it. */
-	proc_setas(curthread->t_vmspace);
+	proc_setas(curproc->p_addrspace);
 	as_activate();
 
 	/* Load the executable. */
@@ -249,13 +254,14 @@ int sys_execv(char *program, char **args) {
 	vfs_close(v);
 
 	/* Define the user stack in the address space */
-	result = as_define_stack(curthread->t_vmspace, &stackptr);
+	result = as_define_stack(curproc->p_addrspace, &stackptr);
 	if (result) {
 		/* p_addrspace will go away when curproc is destroyed */
 		return -result;
 	}
 	
 	
+	/*TODO: copyout*/
 	/* Warp to user mode. */
 	
 

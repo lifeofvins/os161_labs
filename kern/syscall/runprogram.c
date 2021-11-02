@@ -60,6 +60,12 @@ runprogram(char *progname, unsigned long nargs)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+	
+	
+		struct thread *thread = curthread;
+	KASSERT (thread != NULL);
+	
+	
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
