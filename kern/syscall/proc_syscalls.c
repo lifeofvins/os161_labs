@@ -23,6 +23,9 @@
 #include <vnode.h>
 #include <vfs.h>
 #include <test.h>
+
+
+
 /*
  * system calls for process management
  */
@@ -159,6 +162,34 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 #endif /*OPT_FORK*/
 
 #if OPT_EXECV
+
+/*PROGETTO OS161*/
+void 
+kfree_all(char *argv[]) {
+	int i;
+
+	for (i=0; argv[i]; i++)
+		kfree(argv[i]);
+
+}
+
+/*PROGETTO OS161*/
+size_t padding_multiple_four(char *arg) {
+/*padding prima di copiare nel kernel*/
+/*in MIPS i puntatori devono essere allineati a 4*/
+	size_t padding = (size_t)strlen(arg) + 1;
+	kprintf("Stringa: %s\n", arg);
+	while(padding % 4 != 0)
+		padding++;
+		
+	padding -= strlen(arg);
+	kprintf("Padding necessario: %d caratteri\n", padding);
+	/*adesso so quanto padding mettere*/
+	return padding;
+}
+	
+	
+
 int sys_execv(char *program, char **args) {
 	
 	struct addrspace *as_prova;
@@ -168,11 +199,12 @@ int sys_execv(char *program, char **args) {
 	vaddr_t entrypoint, stackptr;
 	int result;
 	size_t dim_args, len;
-	int i;
+	int i /*j*/;
 	
 	/*strutture kernel*/
 	char *kprogram;
 	char **kargs;
+	//size_t padded_length; /*dimensione di ogni argomento con padding*/
 	
 	
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
@@ -188,25 +220,34 @@ int sys_execv(char *program, char **args) {
 	/*alloco il vettore*/
 	kargs = (char **)kmalloc(dim_args * sizeof(char**));
 	if (kargs == NULL) {
-		/*TODO: libera memoria*/
 		return ENOMEM;
 	}
 	
 	/*alloco ogni riga del vettore*/
 	for (i = 0; i < (int)dim_args; i++) {
 		len = strlen(args[i]) + 1;
-		kargs[i] = kmalloc(len); /*con terminatore di stringa*/
+		//padded_length = padding_multiple_four(args[i]);
+		//kargs[i] = kmalloc(padded_length); /*con terminatore di stringa*/
+		kargs[i] = kmalloc(len);
+		kargs[i+1] = NULL;
 		if (kargs[i] == NULL) {
-			/*TODO: libera memoria*/
+			kfree_all(kargs);
+			kfree(kargs);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
 		result = copyin((const_userptr_t)args[i], (void *)kargs[i], len);
 		if (result) {
-			/*TODO: libera memoria*/
+			kfree_all(kargs);
+			kfree(kargs);
 			return -result;
 		}
+		/*padding con '\0'*/
+		/*for (j = len+1; j < (int)padded_length; j++) {
+			kargs[j] = '\0';
+		}*/
 		/*debug*/
+		
 		kprintf("kargs[%d] = %s\n", i, kargs[i]);
 	}
 	as_prova = curproc->p_addrspace;
@@ -215,12 +256,14 @@ int sys_execv(char *program, char **args) {
 	len = strlen(program) + 1;
 	kprogram = kmalloc(len);
 	if (kprogram == NULL) {
-		/*TODO: libera memoria*/
+		kfree(kprogram);
 		return ENOMEM;
 	}
 	result = copyin((const_userptr_t)program, (void *)kprogram, len);
-	if (result) {
-		/*TODO: libera memoria*/
+	if (result) {		
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return -result;
 	}
 	/*debug*/
@@ -240,6 +283,10 @@ int sys_execv(char *program, char **args) {
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
+		as_destroy(curproc->p_addrspace);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return -result;
 	}
 	/* Switch to it and activate it. */
@@ -249,7 +296,10 @@ int sys_execv(char *program, char **args) {
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
 	if (result) {
-		/*TODO: libera memoria*/
+		as_destroy(curproc->p_addrspace);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		/* p_addrspace will go away when curproc is destroyed */
 		vfs_close(v);
 		return result;
@@ -265,7 +315,7 @@ int sys_execv(char *program, char **args) {
 		return -result;
 	}
 	
-	/*devo tornare da kernel a user*/
+	/*devo tornare da kernel a user: qui devo usare il padding*/
 	/*strutture user dopo kernel*/
 	char **uargs;
 	unsigned int cpaddr;
@@ -274,7 +324,10 @@ int sys_execv(char *program, char **args) {
 	//userptr_t args_out_addr;
 	uargs = (char **)kmalloc(sizeof(char *) * (dim_args + 1));
 	if (uargs == NULL) {
-		/*TODO: free*/
+		as_destroy(curproc->p_addrspace);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return ENOMEM;
 	}
 	cpaddr = stackptr;
@@ -282,33 +335,39 @@ int sys_execv(char *program, char **args) {
 		length = strlen(kargs[i])+1;
 		cpaddr -= length;
 		tail = 0;
+		/*padding*/
 		if (cpaddr & 0x3) {
 			tail = cpaddr & 0x3;
-			cpaddr -= tail;
+			cpaddr -= tail; /*sottraggo perchè sto scendendo nello stack*/
 		}
-		copyout((const void *)kargs[i], (userptr_t)cpaddr, length); /*copio da kernel a user*/
-		kargs[i] = NULL;
+		copyout((const void *)kargs[i], (userptr_t)cpaddr, length); /*copio da kernel a
+										user*/
+		*(uargs + i) = (char *)cpaddr; /*mi salvo l'indiritto dello stack user in uargs*/
+		kargs[i] = NULL; 
 		cpaddr -= sizeof(char *)*(i+1); /*sposto lo stack di un offset pari al
 						numero di stringhe che ha messo in kargs[]*/
-		
-		copyout((const void *)uargs, (userptr_t)cpaddr, sizeof(char *)*(i+1));
-		
-		/*TODO: free all*/
 	}
 	
-	
-	/* Warp to user mode. */
+	for (i = 0; i < (int)dim_args; i++) {
+		copyout((const void *)uargs[i], (userptr_t)cpaddr, sizeof(char *)*(i+1));
+	}
+		
 	
 
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	kfree_all(kargs);
+	kfree(kargs);
+	kfree(kprogram);
+	/* Warp to user mode. */
+	//kprintf("Hello I'm proc with pid %d and my name is %s, my father is %p\n", curproc->p_pid, curproc->p_name, curproc->p_parent);
+
+	enter_new_process(dim_args /*argc*/, NULL/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
+			  cpaddr, entrypoint);
 
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
 	return EINVAL;
 	
-	kprintf("YAAAAAAAAAAAAAAAAAAY\n");
 	
 	return 0;
 }
