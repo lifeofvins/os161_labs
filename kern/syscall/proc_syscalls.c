@@ -106,6 +106,11 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   KASSERT(curproc != NULL); /*curproc sarebbe il padre*/
   
   struct proc *parent = curproc;
+  
+  /*debug per execv*/
+#if OPT_EXECV
+  kprintf("I'm the father pid = %d address = %p\n", parent->p_pid, parent);
+#endif
   struct thread *thread = curthread;
   KASSERT(thread != NULL);
   newp = proc_create_runprogram(parent->p_name);
@@ -191,20 +196,16 @@ size_t padding_multiple_four(char *arg) {
 	
 
 int sys_execv(char *program, char **args) {
-	
-	struct addrspace *as_prova;
-	//struct addrspace *as_user;
-	//struct addrspace *as_kernel;
+
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
 	size_t dim_args, len;
-	int i /*j*/;
+	int i;
 	
 	/*strutture kernel*/
 	char *kprogram;
 	char **kargs;
-	//size_t padded_length; /*dimensione di ogni argomento con padding*/
 	
 	
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
@@ -213,8 +214,7 @@ int sys_execv(char *program, char **args) {
 	}
 	
 	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
-	char *prova = args[0];
-	KASSERT (prova != NULL);
+
 	for (dim_args = 0; args[dim_args] != NULL; dim_args++);
 	
 	/*alloco il vettore*/
@@ -226,8 +226,6 @@ int sys_execv(char *program, char **args) {
 	/*alloco ogni riga del vettore*/
 	for (i = 0; i < (int)dim_args; i++) {
 		len = strlen(args[i]) + 1;
-		//padded_length = padding_multiple_four(args[i]);
-		//kargs[i] = kmalloc(padded_length); /*con terminatore di stringa*/
 		kargs[i] = kmalloc(len);
 		kargs[i+1] = NULL;
 		if (kargs[i] == NULL) {
@@ -242,15 +240,11 @@ int sys_execv(char *program, char **args) {
 			kfree(kargs);
 			return -result;
 		}
-		/*padding con '\0'*/
-		/*for (j = len+1; j < (int)padded_length; j++) {
-			kargs[j] = '\0';
-		}*/
 		/*debug*/
 		
-		kprintf("kargs[%d] = %s\n", i, kargs[i]);
+		//kprintf("kargs[%d] = %s\n", i, kargs[i]);
 	}
-	as_prova = curproc->p_addrspace;
+	
 	
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
@@ -267,10 +261,12 @@ int sys_execv(char *program, char **args) {
 		return -result;
 	}
 	/*debug*/
-	kprintf("kprogram = %s\n", kprogram);
+	//kprintf("kprogram = %s\n", kprogram);
 	
-	/*non mi serve più l'address space user, passo a quello di kernel*/
-	
+	/*address space handling*/
+	//struct addrspace *oldas = proc_getas();
+	//curproc_setas();
+	//as_activate();
 	/*t_as lo devo aggiungere io(?)*/
 	as_destroy(curproc->p_addrspace); /* old addrspace is no longer needed */
 	//as_prova = curproc->p_addrspace;
@@ -278,8 +274,6 @@ int sys_execv(char *program, char **args) {
 	if (curproc->p_addrspace==NULL) {
 		return ENOMEM;
 	}
-	//as_prova = curproc->p_addrspace;
-	KASSERT(as_prova != NULL);
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
@@ -295,6 +289,7 @@ int sys_execv(char *program, char **args) {
 
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
+	
 	if (result) {
 		as_destroy(curproc->p_addrspace);
 		kfree_all(kargs);
@@ -307,7 +302,6 @@ int sys_execv(char *program, char **args) {
 
 	/* Done with the file now. */
 	vfs_close(v);
-
 	/* Define the user stack in the address space */
 	result = as_define_stack(curproc->p_addrspace, &stackptr);
 	if (result) {
@@ -340,8 +334,14 @@ int sys_execv(char *program, char **args) {
 			tail = cpaddr & 0x3;
 			cpaddr -= tail; /*sottraggo perchè sto scendendo nello stack*/
 		}
-		copyout((const void *)kargs[i], (userptr_t)cpaddr, length); /*copio da kernel a
-										user*/
+		result = copyout((const void *)kargs[i], (userptr_t)cpaddr, length); /*copio da kernel a user*/
+		if (result) {
+			//kprintf("DAJEEE\n");
+			kfree_all(kargs);
+			kfree(kargs);
+			kfree(kprogram);
+		}
+			
 		*(uargs + i) = (char *)cpaddr; /*mi salvo l'indiritto dello stack user in uargs*/
 		kargs[i] = NULL; 
 		cpaddr -= sizeof(char *)*(i+1); /*sposto lo stack di un offset pari al
@@ -349,7 +349,12 @@ int sys_execv(char *program, char **args) {
 	}
 	
 	for (i = 0; i < (int)dim_args; i++) {
-		copyout((const void *)uargs[i], (userptr_t)cpaddr, sizeof(char *)*(i+1));
+		result = copyout((const void *)uargs[i], (userptr_t)cpaddr, sizeof(char *)*(i+1));
+		if (result) {
+			kfree_all(kargs);
+			kfree(kargs);
+			kfree(kprogram);
+		}
 	}
 		
 	
@@ -358,11 +363,17 @@ int sys_execv(char *program, char **args) {
 	kfree(kargs);
 	kfree(kprogram);
 	/* Warp to user mode. */
-	//kprintf("Hello I'm proc with pid %d and my name is %s, my father is %p\n", curproc->p_pid, curproc->p_name, curproc->p_parent);
-
-	enter_new_process(dim_args /*argc*/, NULL/*userspace addr of argv*/,
+	if (cpaddr % 8 == 0) {
+		stackptr = cpaddr - 8;
+	}
+	else {
+		stackptr = cpaddr - 4;
+	}
+	
+	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
+	enter_new_process(dim_args /*argc*/, (userptr_t)cpaddr/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
-			  cpaddr, entrypoint);
+			  (vaddr_t)stackptr, entrypoint);
 
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");

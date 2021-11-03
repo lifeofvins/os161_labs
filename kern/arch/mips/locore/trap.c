@@ -436,6 +436,8 @@ enter_new_process(int argc, userptr_t argv, userptr_t env,
 	tf.tf_a1 = (vaddr_t)argv;
 	tf.tf_a2 = (vaddr_t)env;
 	tf.tf_sp = stack;
-
+#if OPT_EXECV
+	//kprintf("sono in enter new process\n");
+#endif
 	mips_usermode(&tf);
 }
