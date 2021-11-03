@@ -62,7 +62,7 @@ runprogram(char *progname, unsigned long nargs)
 	int result;
 	
 	
-		struct thread *thread = curthread;
+	struct thread *thread = curthread;
 	KASSERT (thread != NULL);
 	
 	

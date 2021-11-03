@@ -109,7 +109,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   
   /*debug per execv*/
 #if OPT_EXECV
-  kprintf("I'm the father pid = %d address = %p\n", parent->p_pid, parent);
+  //kprintf("I'm the father pid = %d address = %p\n", parent->p_pid, parent);
 #endif
   struct thread *thread = curthread;
   KASSERT(thread != NULL);
@@ -351,6 +351,7 @@ int sys_execv(char *program, char **args) {
 	for (i = 0; i < (int)dim_args; i++) {
 		result = copyout((const void *)uargs[i], (userptr_t)cpaddr, sizeof(char *)*(i+1));
 		if (result) {
+			//kprintf("DAJEEE\n");
 			kfree_all(kargs);
 			kfree(kargs);
 			kfree(kprogram);
@@ -363,6 +364,7 @@ int sys_execv(char *program, char **args) {
 	kfree(kargs);
 	kfree(kprogram);
 	/* Warp to user mode. */
+	//kprintf("Hello I'm proc with pid %d and my name is %s, my father is %p\n", curproc->p_pid, curproc->p_name, curproc->p_parent);
 	if (cpaddr % 8 == 0) {
 		stackptr = cpaddr - 8;
 	}
@@ -370,7 +372,7 @@ int sys_execv(char *program, char **args) {
 		stackptr = cpaddr - 4;
 	}
 	
-	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
+	//kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
 	enter_new_process(dim_args /*argc*/, (userptr_t)cpaddr/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  (vaddr_t)stackptr, entrypoint);
