@@ -82,6 +82,8 @@ int sys_fork(struct trapframe *ctf, pid_t *retval);
 void kfree_all(char *argv[]);
 size_t padding_multiple_four(char *arg);
 int sys_execv(char *program, char **args);
+void add_padding(char *arg, int index, int padding);
+int copyArgs(int argc, char **argv, userptr_t *argvAddr, vaddr_t *stackptr);
 #endif /*OPT_EXECV*/
 #endif /*OPT_SYSCALLS*/
 

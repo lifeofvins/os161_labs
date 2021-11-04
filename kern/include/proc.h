@@ -150,4 +150,9 @@ void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 void proc_add_child(struct proc *parent, struct proc *child);
 #endif
 
+
+//#if OPT_EXECV
+struct addrspace *curproc_getas(void);
+struct addrspace *curproc_setas(struct addrspace *newas);
+//#endif
 #endif /* _PROC_H_ */
