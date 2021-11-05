@@ -38,6 +38,8 @@
 #include <vm.h>
 #include "opt-dumbvm.h"
 
+/*progetto os161*/
+#include "opt-execv.h"
 struct vnode;
 
 
@@ -107,7 +109,10 @@ struct addrspace {
 
 struct addrspace *as_create(void);
 int               as_copy(struct addrspace *src, struct addrspace **ret);
-void              as_activate(void);
+
+
+void		  as_activate(void);
+
 void              as_deactivate(void);
 void              as_destroy(struct addrspace *);
 

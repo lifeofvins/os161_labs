@@ -355,31 +355,6 @@ thread_getas(void) {
 	as = thread->t_addrspace;
 	spinlock_release(&thread->t_spinlock);
 	return as;
-
-
-struct addrspace *
-curthread_getas(void) {
-	struct addrspace *as;
-	if (curthread == NULL) {
-		return NULL;
-	}
-
-	spinlock_acquire(&curthread->t_spinlock);
-	as = curthread->t_addrspace;
-	spinlock_release(&curthread->t_spinlock);
-	return as;	
-}
-
-struct addrspace *
-curthread_setas(struct addrspace *newas) {
-	struct addrspace * oldas;
-	struct thread * thread = curthread;
-
-	spinlock_acquire(&thread->t_spinlock);
-	oldas = thread->t_addrspace;
-	thread->t_addrspace = newas;
-	spinlock_release(&thread->t_spinlock);
-	return oldas;
 }
 #endif /*OPT_EXECV*/
 

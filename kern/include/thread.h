@@ -39,6 +39,7 @@
 #include <array.h>
 #include <spinlock.h>
 #include <threadlist.h>
+#include "opt-execv.h"
 
 #if OPT_EXECV
 #include <addrspace.h>
@@ -182,7 +183,5 @@ void thread_consider_migration(void);
 #if OPT_EXECV
 struct addrspace *thread_setas(struct addrspace *newas);
 struct addrspace *thread_getas(void);
-struct addrspace *curthread_getas(void);
-struct addrspace *curthread_setas(struct addrspace *newas);
 #endif
 #endif /* _THREAD_H_ */
