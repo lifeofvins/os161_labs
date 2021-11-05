@@ -112,7 +112,8 @@ struct thread {
 
 	/* add more here as needed */
 #if OPT_EXECV
-	struct addrspace *t_as;
+	struct addrspace *t_addrspace;
+	struct spinlock t_spinlock; /*per funzioni con address space*/
 #endif
 };
 
@@ -177,4 +178,11 @@ void schedule(void);
 void thread_consider_migration(void);
 
 
+
+#if OPT_EXECV
+struct addrspace *thread_setas(struct addrspace *newas);
+struct addrspace *thread_getas(void);
+struct addrspace *curthread_getas(void);
+struct addrspace *curthread_setas(struct addrspace *newas);
+#endif
 #endif /* _THREAD_H_ */
