@@ -569,7 +569,7 @@ thread_fork(const char *name,
 	int result;
 	
 	struct proc *parent = curproc; /*per debug*/
-	KASSERT (proc != NULL);
+	//KASSERT (proc != NULL);
 	newthread = thread_create(name); /*creates the data structure*/
 	if (newthread == NULL) {
 		return ENOMEM;

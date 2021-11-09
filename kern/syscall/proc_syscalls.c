@@ -25,7 +25,7 @@
 #include <test.h>
 
 
-#define PRINT 1
+#define PRINT 0
 /*
  * system calls for process management
  */
@@ -176,72 +176,6 @@ kfree_all(char *argv[]) {
 }
 
 /*PROGETTO OS161*/
-size_t padding_multiple_four(char *arg) {
-/*padding prima di copiare nel kernel*/
-/*in MIPS i puntatori devono essere allineati a 4*/
-	size_t len = (size_t)strlen(arg) + 1;
-	//size_t padding = (size_t)strlen(arg) + 1;
-	size_t padding = 0;
-	kprintf("Stringa: %s\n", arg);
-	while((len + padding) % 4 != 0)
-		padding++;
-		
-	//padding -= strlen(arg);
-#if PRINT
-	kprintf("Padding necessario: %d caratteri\n", padding);
-#endif
-	/*adesso so quanto padding mettere*/
-	return padding;
-}
-
-void add_padding(char *arg, int index, int padding) {
-	int i;
-	for (i = index; i < index + padding; i++) {
-		arg[i] = '\0';
-	}
-#if PRINT
-	kprintf("Padded arg = %s\n", arg);
-#endif
-}
-	
-	
-int copyArgs (int argc, char **argv, userptr_t *argvAddr, vaddr_t *stackptr) {
-	vaddr_t stack = *stackptr; 
-	char **newArgv = kmalloc(sizeof(char *)*(argc+1));
-	size_t wasteOfSpace;
-	int errcode;
-	
-	for (int i = 0; i < argc; ++i) {
-		int arglen = strlen(*(argv + i)) + 1; //length of char array for this arg
-		stack -= ROUNDUP(arglen, 8);
-		errcode = copyoutstr(*(argv+i), (userptr_t)stack, arglen, &wasteOfSpace);
-		if (errcode) {
-			kfree(newArgv);
-			return errcode;
-		}
-		*(newArgv + i) = (char *)stack; //our argv kernel array is going to contain the user as
-	}
-	*(newArgv + argc) = NULL; //set final address to NULL
-	
-	for (int i = 0; i <= argc; ++i) {
-		stack -= sizeof(char *); //move the stack pointer back one pointer worth of space
-		errcode = copyout(newArgv + (argc - i), (userptr_t)stack, sizeof(char *));
-		if (errcode) {
-			kfree(newArgv);
-			return errcode;
-		}
-	}
-	
-	*argvAddr = (userptr_t)stack; //set the argv array in userland to start at where we put it
-	if (stack % 8 == 0) stack -= 8;
-	else stack -= 4;
-	*stackptr = stack; //set the real stack pointer to the one we've been dealing with
-	kfree(newArgv);
-	return 0;
-}
-
-
-
 
 int sys_execv(char *program, char **args) {
 
@@ -344,10 +278,12 @@ int sys_execv(char *program, char **args) {
 	
 	(void)oldas; //per evitare i warning
 	
+/*SO FAR SO GOOD*/
+/*a questo punto del codice ci arrivano tutti i processi figli creati dalle fork chiamate prima della execv in testbin/farm*/
+/*se sposto più in giù nel codice questa kprintf non ci arrivano tutti i figli*/
 #if PRINT
 	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
 #endif
-/*SO FAR SO GOOD*/
 
 	/* Done with the file now. */
 	vfs_close(v);
