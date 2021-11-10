@@ -26,12 +26,19 @@
 
 
 #define PRINT 0
+
+
+#define DEVELOP 1 /*prova nuovi codici*/
+
 /*
  * system calls for process management
  */
 void
 sys__exit(int status)
 {
+/*TODO: check if parent exists or if parent has exited, then we even don't bother fill the exit code, since no one cares*/
+/*TODO: the exit code must be made using the MACROs in wait.h*/
+#if OPT_EXECV
 #if OPT_WAITPID
   struct proc *p = curproc;
   p->p_status = status & 0xff; /* just lower 8 bits returned */
@@ -47,16 +54,29 @@ sys__exit(int status)
   /* get address space of current process and destroy */
   struct addrspace *as = proc_getas();
   as_destroy(as);
-#endif
+#endif /*OPT_WAITPID*/
+#endif /*OPT_EXECV*/
   thread_exit();
 
   panic("thread_exit returned (should not happen)\n");
-  (void) status; // TODO: status handling
+  (void) status; // TODO: status handling --> exit code
 }
 
 int
 sys_waitpid(pid_t pid, userptr_t statusp, int options)
 {
+
+/*PROGETTO PDS*/
+/*TODO: 
+1) argument checking: 
+	- is the status pointer properly aligned by 4?
+	- is the status pointer a valid pointer anyway (NULL, point to kernel,...)?
+	- is options valid? (more flags than WHOHANG | WUNTRACED)
+	- does the waited pid exist/valid?
+	- if exists, are we allowed to wait it? (is it our child?)
+2) after successfully get the exitcode, destroy child's process structure
+3) free child's slot in the process array
+*/
 #if OPT_WAITPID
   struct proc *p = proc_search_pid(pid);
   int s;
@@ -65,6 +85,7 @@ sys_waitpid(pid_t pid, userptr_t statusp, int options)
   s = proc_wait(p);
   if (statusp!=NULL) 
     *(int*)statusp = s;
+
   return pid;
 #else
   (void)options; /* not handled */
@@ -347,13 +368,14 @@ int sys_execv(char *program, char **args) {
 	kfree(kargs);
 	kfree(kprogram);
 	/* Warp to user mode. */
-
+#if 0
 	if (ustackptr % 8 == 0) {
 		stackptr = ustackptr - 8;
 	}
 	else {
 		stackptr = ustackptr - 4;
 	}
+#endif
 	enter_new_process(argc /*argc*/, (userptr_t)ustackptr/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  (vaddr_t)stackptr, entrypoint);

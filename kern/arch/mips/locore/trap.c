@@ -111,8 +111,9 @@ kill_curthread(vaddr_t epc, unsigned code, vaddr_t vaddr)
 	/*
 	 * You will probably want to change this.
 	 */
-	 
-	 sys__exit(0);
+#if OPT_EXECV 
+	 sys__exit(-1); /*se il programma user accede a un indirizzo a cui non può accedere faccio uscire il thread*/
+#endif
 
 	kprintf("Fatal user mode trap %u sig %d (%s, epc 0x%x, vaddr 0x%x)\n",
 		code, sig, trapcodenames[code], epc, vaddr);

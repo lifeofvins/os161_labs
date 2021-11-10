@@ -89,6 +89,7 @@ struct thread {
 	struct cpu *t_cpu;		/* CPU thread runs on */
 	struct proc *t_proc;		/* Process thread belongs to */
 	HANGMAN_ACTOR(t_hangman);	/* Deadlock detector hook */
+	
 
 	/*
 	 * Interrupt state fields.
@@ -113,8 +114,8 @@ struct thread {
 
 	/* add more here as needed */
 #if OPT_EXECV
-	struct addrspace *t_addrspace;
-	struct spinlock t_spinlock; /*per funzioni con address space*/
+	struct addrspace *t_addrspace; /*virtual address space*/
+	struct spinlock t_spinlock;
 #endif
 };
 

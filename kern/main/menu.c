@@ -90,9 +90,7 @@ cmd_progthread(void *ptr, unsigned long nargs)
 
 	strcpy(progname, args[0]);
 
-	result = runprogram(progname, nargs); /*passo a runprogram il nome del programma,
-						   il numero di argomenti e il puntatore void al
-						   vettore di argomenti*/
+	result = runprogram(progname, nargs, args); 
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
 			strerror(result));
