@@ -24,12 +24,6 @@
 #include <vfs.h>
 #include <test.h>
 
-
-#define PRINT 0
-
-
-#define DEVELOP 1 /*prova nuovi codici*/
-
 /*
  * system calls for process management
  */
@@ -188,10 +182,10 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 
 /*PROGETTO OS161*/
 void 
-kfree_all(char *argv[]) {
+kfree_all(char *argv[], int dim) {
 	int i;
 
-	for (i=0; argv[i]; i++)
+	for (i=0; i < dim; i++)
 		kfree(argv[i]);
 
 }
@@ -213,7 +207,8 @@ int sys_execv(char *program, char **args) {
 	struct addrspace *oldas;
 	struct addrspace *newas;
 	struct proc *proc = curproc;
-	
+	size_t waste;
+	KASSERT(proc != NULL); /*warning*/
 	
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
 	if (program == NULL || args == NULL) {
@@ -224,6 +219,9 @@ int sys_execv(char *program, char **args) {
 
 	for (argc = 0; args[argc] != NULL; argc++);
 	
+	if (argc >= ARG_MAX) {
+		return E2BIG;
+	}
 	/*alloco il vettore*/
 	kargs = (char **)kmalloc(argc * sizeof(char**));
 	if (kargs == NULL) {
@@ -234,51 +232,50 @@ int sys_execv(char *program, char **args) {
 	for (i = 0; i < (int)argc; i++) {
 		len = strlen(args[i]) + 1;
 		kargs[i] = kmalloc(len);
-		kargs[i+1] = NULL;
 		if (kargs[i] == NULL) {
-			kfree_all(kargs);
+			//kfree_all(kargs, argc);
 			kfree(kargs);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
-		result = copyin((const_userptr_t)args[i], (void *)kargs[i], len);
+		result = copyinstr((userptr_t)args[i], kargs[i], len, &waste);
 		if (result) {
-			kfree_all(kargs);
+			//kfree_all(kargs, argc);
 			kfree(kargs);
 			return -result;
 		}
 		
 	}
-	
-	
+	kargs[i] = NULL;
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
-	kprogram = kmalloc(len);
+	kprogram = (char *)kmalloc(len);
 	if (kprogram == NULL) {
 		kfree(kprogram);
 		return ENOMEM;
 	}
-	result = copyin((const_userptr_t)program, (void *)kprogram, len);
+	result = copyinstr((userptr_t)program, kprogram, len, &waste);
 	if (result) {		
-		kfree_all(kargs);
+		//kfree_all(kargs, argc);
 		kfree(kargs);
 		kfree(kprogram);
 		return -result;
 	}
+	
+	
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
-		as_destroy(curproc->p_addrspace);
-		kfree_all(kargs);
+		//kfree_all(kargs, argc);
 		kfree(kargs);
 		kfree(kprogram);
 		return -result;
 	}
 	/*address space handling*/
-	
+	oldas = proc_setas(NULL);
+	KASSERT(proc_getas() == NULL);
 	
 	/*create a new address space*/
-	as_destroy(proc->p_addrspace);
 	newas = as_create();
 	if (newas == NULL) {
 		vfs_close(v);
@@ -286,7 +283,7 @@ int sys_execv(char *program, char **args) {
 	}
 	
 	/*Switch to it and activate it*/
-	oldas = proc_setas(newas);
+	proc_setas(newas); /*proc_setas restituisce il vecchio address space*/
 	as_activate();
 	
 	/*Load the executable*/
@@ -296,89 +293,83 @@ int sys_execv(char *program, char **args) {
 		vfs_close(v);
 		return result;
 	}
-	
-	(void)oldas; //per evitare i warning
-	
-/*SO FAR SO GOOD*/
-/*a questo punto del codice ci arrivano tutti i processi figli creati dalle fork chiamate prima della execv in testbin/farm*/
-/*se sposto più in giù nel codice questa kprintf non ci arrivano tutti i figli*/
-#if PRINT
-	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
-#endif
 
 	/* Done with the file now. */
 	vfs_close(v);
+	
 	/* Define the user stack in the address space */
 	result = as_define_stack(newas, &stackptr);
 	if (result) {
 		/* p_addrspace will go away when curproc is destroyed */
+		//kfree_all(kargs, argc);
+		kfree(kargs);
+		kfree(kprogram);
+		proc_setas(oldas);
+		as_destroy(newas);
 		return -result;
 	}
 	
 	/*devo tornare da kernel a user: qui devo usare il padding*/
 	/*strutture user dopo kernel*/
 	char **uargs;
-	unsigned int ustackptr; /*user stack pointer*/
-	int length, tail;
-	
 
-	uargs = (char **)kmalloc(sizeof(char *) * (argc + 1));
+	int length;
+
+	uargs = (char **)kmalloc(sizeof(char **) * (argc+1)); 
 	if (uargs == NULL) {
 		as_destroy(curproc->p_addrspace);
-		kfree_all(kargs);
+		//kfree_all(kargs, argc);
 		kfree(kargs);
 		kfree(kprogram);
 		return ENOMEM;
 	}
-	ustackptr = stackptr;
+	
 	for (i = 0; i < (int)argc; i++) {
 		length = strlen(kargs[i])+1;
-		ustackptr -= length;
-		tail = 0;
-		/*padding*/
-		if (ustackptr & 0x3) {
-			tail = ustackptr & 0x3;
-			ustackptr -= tail; /*sottraggo perchè sto scendendo nello stack*/
-		}
-		result = copyout((const void *)kargs[i], (userptr_t)ustackptr, length); /*copio da kernel a user*/
-		if (result) {
-			kfree_all(kargs);
-			kfree(kargs);
-			kfree(kprogram);
-		}
-			
-		*(uargs + i) = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
-		kargs[i] = NULL; 
-		ustackptr -= sizeof(char *)*(i+1); /*sposto lo stack di un offset pari al
-						numero di stringhe che ha messo in kargs[]*/
-	}
-	
-	for (i = 0; i < (int)argc; i++) {
-		result = copyout((const void *)uargs[i], (userptr_t)ustackptr, sizeof(char *)*(i+1));
-		if (result) {
-			kfree_all(kargs);
-			kfree(kargs);
-			kfree(kprogram);
-		}
-	}
+		uargs[i] = kmalloc(sizeof(char *));
 		
-	
+		stackptr -= length;
+		/*padding*/
+		if (stackptr & 0x3) {
+			stackptr -= (stackptr & 0x3);; /*sottraggo perchè sto scendendo nello stack*/
+		}
+		uargs[i] = (char *)stackptr; /*mi salvo l'indirizzo dello stack user in uargs*/
+		/*prototype: int copyoutstr(const char *src, userptr_t userdest, size_t len, size_t *actual)*/
+		result = copyoutstr(kargs[i], (userptr_t)stackptr, length, &waste); /*copio da kernel a user*/
+		if (result) {
+			//kfree_all(uargs, argc);
+			kfree(uargs);
+		} 
 
-	kfree_all(kargs);
+	}
+
+	/*a questo punto devo memorizzare le posizioni nello stack degli argomenti*/
+	for (i = 0; i < (int)argc; i++) {
+		stackptr -= sizeof(char *); //scendo di uno "slot" e in quello slot memorizzo l'indirizzo
+		result = copyout(uargs[argc-(i+1)], (userptr_t)stackptr, sizeof(char *));
+		if (result) {
+			//kfree_all(uargs, argc);
+			kfree(uargs);
+			return -result;
+		}
+	}
+
+	//if (stackptr % 8 == 0) stackptr -= 8;
+	//else stackptr -= 4; /*BOOOOOOOOOOOOOOOOOOOOo*/
+
+	//kfree_all(uargs, argc);
+	kfree(uargs);
+	
+	
+	as_destroy(oldas); //delete old address space, enter new process*/
+	//kfree_all(kargs, argc);
 	kfree(kargs);
 	kfree(kprogram);
 	/* Warp to user mode. */
-#if 0
-	if (ustackptr % 8 == 0) {
-		stackptr = ustackptr - 8;
-	}
-	else {
-		stackptr = ustackptr - 4;
-	}
-#endif
-	enter_new_process(argc /*argc*/, (userptr_t)ustackptr/*userspace addr of argv*/,
+/*enter_new_process(int argc, userptr_t argv, userptr_t env, vaddr_t stackptr, vaddr_t entrypoint);*/
+	enter_new_process(argc /*argc*/, (userptr_t)stackptr/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
-			  (vaddr_t)stackptr, entrypoint);
+			  stackptr, entrypoint);
 
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");

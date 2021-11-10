@@ -45,27 +45,27 @@
 #include <syscall.h>
 #include <test.h>
 #include <copyinout.h>
-
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
  *
  * Calls vfs_open on progname and thus may destroy it.
  */
+ 
+/*progetto pds: ho aggiunto nargs e ptr come parametri*/
 int
-runprogram(char *progname, unsigned long argc, char **args)
+runprogram(char *progname, unsigned long nargs /*, char **argv*/)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
-	struct thread *thread = curthread;
-	KASSERT(thread!=NULL);
 	int result;
-	unsigned long i;
-	size_t len;
-	//size_t stackoffset = 0;
-	vaddr_t argvptr[argc];
-	//userptr_t argv = ptr;
+	
+	
+	struct thread *thread = curthread;
+	KASSERT (thread != NULL);
+	
+	
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -104,34 +104,17 @@ runprogram(char *progname, unsigned long argc, char **args)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
-
-	//additional code to move argv to user space
 	
-	//argvptr = (userptr_t *)kmalloc(argc * sizeof(userptr_t *)); //allocazione
-	for(i=0; i < argc; i++){	
-		len = strlen(args[i]) + 1;
-		stackptr -= len; //sposto lo stack
-		
-		if (stackptr & 0x3) {
-			stackptr -= (stackptr & 0x3); //padding stack a multipli di 4
-		}
-		argvptr[i] = stackptr;
-		copyout((void *)args[i], (userptr_t)argvptr[i], len);
-	}
-	argvptr[i] = 0;
-	
-	for (i = 0; i < argc; i++) {
-		stackptr -= sizeof(vaddr_t);
-		copyout((void *)argvptr[argc - i - 1], (userptr_t)stackptr, sizeof(vaddr_t));
-	}
 	
 	/* Warp to user mode. */
-	enter_new_process(argc /*argc*/, (userptr_t) stackptr/*NULL (void*)argsuserspace addr of argv*/,
+	
+
+	enter_new_process(nargs /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint); 
+			  stackptr, entrypoint);
+
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
-
 
