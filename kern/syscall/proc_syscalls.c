@@ -41,7 +41,7 @@ sys__exit(int status)
   V(p->p_sem);
 #else
   lock_acquire(p->p_lock);
-  cv_signal(p->p_cv);
+  cv_signal(p->p_cv, p->p_lock);
   lock_release(p->p_lock);
 #endif
 #else
@@ -191,6 +191,13 @@ kfree_all(char *argv[], int dim) {
 }
 
 /*PROGETTO OS161*/
+struct kargs_t{
+	char **buffer; /*vettore di puntatori*/
+	char *kprogname;
+	struct lock *lock;
+};
+
+static struct kargs_t kargs;
 
 int sys_execv(char *program, char **args) {
 
@@ -201,8 +208,8 @@ int sys_execv(char *program, char **args) {
 	int i;
 	
 	/*strutture kernel*/
-	char *kprogram;
-	char **kargs;
+	//char *kprogram;
+	//char **kargs;
 	
 	struct addrspace *oldas;
 	struct addrspace *newas;
@@ -214,61 +221,72 @@ int sys_execv(char *program, char **args) {
 	if (program == NULL || args == NULL) {
 		return EFAULT;
 	}
-	
+	kargs.lock = lock_create("arglock"); //non so se è giusto crearlo qui ma non penso
 	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
+	
+	
+/*****************************************COPY IN**************************************/
 
+	lock_acquire(kargs.lock);
 	for (argc = 0; args[argc] != NULL; argc++);
 	
 	if (argc >= ARG_MAX) {
+		lock_release(kargs.lock);
 		return E2BIG;
 	}
 	/*alloco il vettore*/
-	kargs = (char **)kmalloc(argc * sizeof(char**));
-	if (kargs == NULL) {
+	kargs.buffer = (char **)kmalloc(argc * sizeof(char**));
+
+	if (kargs.buffer == NULL) {
 		return ENOMEM;
 	}
 	
 	/*alloco ogni riga del vettore*/
 	for (i = 0; i < (int)argc; i++) {
 		len = strlen(args[i]) + 1;
-		kargs[i] = kmalloc(len);
-		if (kargs[i] == NULL) {
+		kargs.buffer[i] = kmalloc(len);
+		if (kargs.buffer[i] == NULL) {
 			//kfree_all(kargs, argc);
-			kfree(kargs);
+			//kfree(kargs);
+			lock_release(kargs.lock);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
-		result = copyinstr((userptr_t)args[i], kargs[i], len, &waste);
+		result = copyinstr((userptr_t)args[i], kargs.buffer[i], len, &waste);
 		if (result) {
 			//kfree_all(kargs, argc);
-			kfree(kargs);
+			//kfree(kargs);
+			lock_release(kargs.lock);
 			return -result;
 		}
 		
 	}
-	kargs[i] = NULL;
+	kargs.buffer[i] = NULL;
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
-	kprogram = (char *)kmalloc(len);
-	if (kprogram == NULL) {
-		kfree(kprogram);
+	kargs.kprogname = (char *)kmalloc(len);
+	if (kargs.kprogname == NULL) {
+		//kfree(kprogram);
+		lock_release(kargs.lock);
 		return ENOMEM;
 	}
-	result = copyinstr((userptr_t)program, kprogram, len, &waste);
+	result = copyinstr((userptr_t)program, kargs.kprogname, len, &waste);
 	if (result) {		
 		//kfree_all(kargs, argc);
-		kfree(kargs);
-		kfree(kprogram);
+		//kfree(kargs);
+		//kfree(kprogram);
+		lock_release(kargs.lock);
 		return -result;
 	}
-	
+
 	
 	/* Open the file. */
-	result = vfs_open(kprogram, O_RDONLY, 0, &v);
+	result = vfs_open(kargs.kprogname, O_RDONLY, 0, &v);
 	if (result) {
 		//kfree_all(kargs, argc);
-		kfree(kargs);
-		kfree(kprogram);
+		//kfree(kargs);
+		//kfree(kprogram);
+		lock_release(kargs.lock);
 		return -result;
 	}
 	/*address space handling*/
@@ -279,6 +297,7 @@ int sys_execv(char *program, char **args) {
 	newas = as_create();
 	if (newas == NULL) {
 		vfs_close(v);
+		lock_release(kargs.lock);
 		return ENOMEM;
 	}
 	
@@ -291,6 +310,7 @@ int sys_execv(char *program, char **args) {
 	if  (result) {
 		/*p_addrspace will go away when curproc is destroyed*/
 		vfs_close(v);
+		lock_release(kargs.lock);
 		return result;
 	}
 
@@ -302,10 +322,11 @@ int sys_execv(char *program, char **args) {
 	if (result) {
 		/* p_addrspace will go away when curproc is destroyed */
 		//kfree_all(kargs, argc);
-		kfree(kargs);
-		kfree(kprogram);
+		//kfree(kargs);
+		//kfree(kprogram);
 		proc_setas(oldas);
 		as_destroy(newas);
+		lock_release(kargs.lock);
 		return -result;
 	}
 	
@@ -319,13 +340,15 @@ int sys_execv(char *program, char **args) {
 	if (uargs == NULL) {
 		as_destroy(curproc->p_addrspace);
 		//kfree_all(kargs, argc);
-		kfree(kargs);
-		kfree(kprogram);
+		//kfree(kargs);
+		//kfree(kprogram);
+		lock_release(kargs.lock);
 		return ENOMEM;
 	}
 	
+	KASSERT(lock_do_i_hold(kargs.lock));
 	for (i = 0; i < (int)argc; i++) {
-		length = strlen(kargs[i])+1;
+		length = strlen(kargs.buffer[i])+1;
 		uargs[i] = kmalloc(sizeof(char *));
 		
 		stackptr -= length;
@@ -335,10 +358,11 @@ int sys_execv(char *program, char **args) {
 		}
 		uargs[i] = (char *)stackptr; /*mi salvo l'indirizzo dello stack user in uargs*/
 		/*prototype: int copyoutstr(const char *src, userptr_t userdest, size_t len, size_t *actual)*/
-		result = copyoutstr(kargs[i], (userptr_t)stackptr, length, &waste); /*copio da kernel a user*/
+		result = copyoutstr(kargs.buffer[i], (userptr_t)stackptr, length, &waste); /*copio da kernel a user*/
 		if (result) {
 			//kfree_all(uargs, argc);
 			kfree(uargs);
+			lock_release(kargs.lock);
 		} 
 
 	}
@@ -350,6 +374,7 @@ int sys_execv(char *program, char **args) {
 		if (result) {
 			//kfree_all(uargs, argc);
 			kfree(uargs);
+			lock_release(kargs.lock);
 			return -result;
 		}
 	}
@@ -363,8 +388,12 @@ int sys_execv(char *program, char **args) {
 	
 	as_destroy(oldas); //delete old address space, enter new process*/
 	//kfree_all(kargs, argc);
-	kfree(kargs);
-	kfree(kprogram);
+	//kfree(kargs);
+	//kfree(kprogram);
+	
+	
+	lock_release(kargs.lock);
+	
 	/* Warp to user mode. */
 /*enter_new_process(int argc, userptr_t argv, userptr_t env, vaddr_t stackptr, vaddr_t entrypoint);*/
 	enter_new_process(argc /*argc*/, (userptr_t)stackptr/*userspace addr of argv*/,

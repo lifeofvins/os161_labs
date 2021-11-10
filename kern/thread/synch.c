@@ -210,10 +210,6 @@ lock_destroy(struct lock *lock)
 void
 lock_acquire(struct lock *lock)
 {
-
-        // Write this
-
-
 #if OPT_SYNCH
 	KASSERT(lock != NULL);
 	KASSERT(!(lock_do_i_hold(lock))); /*fermati se possiedo già il lock*/
