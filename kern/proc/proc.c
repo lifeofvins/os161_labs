@@ -185,12 +185,12 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
 
 	proc_init_waitpid(proc,name);
-#if USE_SEMAPHORE_FOR_WAITPID
+/*#if USE_SEMAPHORE_FOR_WAITPID
 	proc->p_sem = sem_create(name, 0);
 #else
 	proc->p_lock = lock_create(name);
 	proc->p_cv = cv_create(name);
-#endif
+#endif*/
 #if OPT_FILE
 	/*create per process fileTable*/
 	/*cabodi*/
@@ -289,12 +289,12 @@ proc_destroy(struct proc *proc)
 
 	KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_spinlock);
-#if USE_SEMAPHORE_FOR_WAITPID
+/*#if USE_SEMAPHORE_FOR_WAITPID
 	sem_destroy(proc->p_sem);
 #else
 	lock_destroy(proc->p_lock);
 	cv_destroy(proc->p_cv);
-#endif
+#endif*/
 
 	proc_end_waitpid(proc);
 

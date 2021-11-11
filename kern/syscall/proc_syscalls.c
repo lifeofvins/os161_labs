@@ -24,6 +24,12 @@
 #include <vfs.h>
 #include <test.h>
 
+
+#define PRINT 0
+
+
+#define DEVELOP 1 /*prova nuovi codici*/
+
 /*
  * system calls for process management
  */
@@ -182,22 +188,15 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 
 /*PROGETTO OS161*/
 void 
-kfree_all(char *argv[], int dim) {
+kfree_all(char *argv[]) {
 	int i;
 
-	for (i=0; i < dim; i++)
+	for (i=0; argv[i]; i++)
 		kfree(argv[i]);
 
 }
 
 /*PROGETTO OS161*/
-struct kargs_t{
-	char **buffer; /*vettore di puntatori*/
-	char *kprogname;
-	struct lock *lock;
-};
-
-static struct kargs_t kargs;
 
 int sys_execv(char *program, char **args) {
 
@@ -208,101 +207,86 @@ int sys_execv(char *program, char **args) {
 	int i;
 	
 	/*strutture kernel*/
-	//char *kprogram;
-	//char **kargs;
+	char *kprogram;
+	char **kargs;
 	
 	struct addrspace *oldas;
 	struct addrspace *newas;
 	struct proc *proc = curproc;
-	size_t waste;
-	KASSERT(proc != NULL); /*warning*/
+	
 	
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
 	if (program == NULL || args == NULL) {
 		return EFAULT;
 	}
-	kargs.lock = lock_create("arglock"); //non so se è giusto crearlo qui ma non penso
+	
 	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
-	
-	
-/*****************************************COPY IN**************************************/
 
-	lock_acquire(kargs.lock);
 	for (argc = 0; args[argc] != NULL; argc++);
 	
-	if (argc >= ARG_MAX) {
-		lock_release(kargs.lock);
-		return E2BIG;
-	}
 	/*alloco il vettore*/
-	kargs.buffer = (char **)kmalloc(argc * sizeof(char**));
-
-	if (kargs.buffer == NULL) {
+	kargs = (char **)kmalloc(argc * sizeof(char**));
+	if (kargs == NULL) {
 		return ENOMEM;
 	}
 	
 	/*alloco ogni riga del vettore*/
 	for (i = 0; i < (int)argc; i++) {
 		len = strlen(args[i]) + 1;
-		kargs.buffer[i] = kmalloc(len);
-		if (kargs.buffer[i] == NULL) {
-			//kfree_all(kargs, argc);
-			//kfree(kargs);
-			lock_release(kargs.lock);
+		kargs[i] = kmalloc(len);
+		kargs[i+1] = NULL;
+		if (kargs[i] == NULL) {
+			kfree_all(kargs);
+			kfree(kargs);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
-		result = copyinstr((userptr_t)args[i], kargs.buffer[i], len, &waste);
+		result = copyin((const_userptr_t)args[i], (void *)kargs[i], len);
 		if (result) {
-			//kfree_all(kargs, argc);
-			//kfree(kargs);
-			lock_release(kargs.lock);
+			kfree_all(kargs);
+			kfree(kargs);
 			return -result;
 		}
 		
 	}
-	kargs.buffer[i] = NULL;
+	
+	
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
-	kargs.kprogname = (char *)kmalloc(len);
-	if (kargs.kprogname == NULL) {
-		//kfree(kprogram);
-		lock_release(kargs.lock);
+	kprogram = kmalloc(len);
+	if (kprogram == NULL) {
+		kfree(kprogram);
 		return ENOMEM;
 	}
-	result = copyinstr((userptr_t)program, kargs.kprogname, len, &waste);
+	result = copyin((const_userptr_t)program, (void *)kprogram, len);
 	if (result) {		
-		//kfree_all(kargs, argc);
-		//kfree(kargs);
-		//kfree(kprogram);
-		lock_release(kargs.lock);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return -result;
 	}
-
-	
 	/* Open the file. */
-	result = vfs_open(kargs.kprogname, O_RDONLY, 0, &v);
+	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
-		//kfree_all(kargs, argc);
-		//kfree(kargs);
-		//kfree(kprogram);
-		lock_release(kargs.lock);
+		as_destroy(curproc->p_addrspace);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return -result;
 	}
 	/*address space handling*/
-	oldas = proc_setas(NULL);
-	KASSERT(proc_getas() == NULL);
+	
 	
 	/*create a new address space*/
+	as_destroy(proc->p_addrspace);
 	newas = as_create();
 	if (newas == NULL) {
 		vfs_close(v);
-		lock_release(kargs.lock);
 		return ENOMEM;
 	}
 	
 	/*Switch to it and activate it*/
-	proc_setas(newas); /*proc_setas restituisce il vecchio address space*/
+	oldas = proc_setas(newas);
 	as_activate();
 	
 	/*Load the executable*/
@@ -310,93 +294,87 @@ int sys_execv(char *program, char **args) {
 	if  (result) {
 		/*p_addrspace will go away when curproc is destroyed*/
 		vfs_close(v);
-		lock_release(kargs.lock);
 		return result;
 	}
+	
+	(void)oldas; //per evitare i warning
+	
+/*SO FAR SO GOOD*/
+/*a questo punto del codice ci arrivano tutti i processi figli creati dalle fork chiamate prima della execv in testbin/farm*/
+/*se sposto più in giù nel codice questa kprintf non ci arrivano tutti i figli*/
+#if PRINT
+	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
+#endif
 
 	/* Done with the file now. */
 	vfs_close(v);
-	
 	/* Define the user stack in the address space */
 	result = as_define_stack(newas, &stackptr);
 	if (result) {
 		/* p_addrspace will go away when curproc is destroyed */
-		//kfree_all(kargs, argc);
-		//kfree(kargs);
-		//kfree(kprogram);
-		proc_setas(oldas);
-		as_destroy(newas);
-		lock_release(kargs.lock);
 		return -result;
 	}
 	
 	/*devo tornare da kernel a user: qui devo usare il padding*/
 	/*strutture user dopo kernel*/
 	char **uargs;
+	vaddr_t ustackptr; /*user stack pointer*/
+	int length, tail;
+	
 
-	int length;
-
-	uargs = (char **)kmalloc(sizeof(char **) * (argc+1)); 
+	uargs = (char **)kmalloc(sizeof(char *) * (argc + 1));
 	if (uargs == NULL) {
 		as_destroy(curproc->p_addrspace);
-		//kfree_all(kargs, argc);
-		//kfree(kargs);
-		//kfree(kprogram);
-		lock_release(kargs.lock);
+		kfree_all(kargs);
+		kfree(kargs);
+		kfree(kprogram);
 		return ENOMEM;
 	}
-	
-	KASSERT(lock_do_i_hold(kargs.lock));
+	ustackptr = stackptr;
 	for (i = 0; i < (int)argc; i++) {
-		length = strlen(kargs.buffer[i])+1;
-		uargs[i] = kmalloc(sizeof(char *));
-		
-		stackptr -= length;
+		length = strlen(kargs[i])+1;
+		ustackptr -= length;
+		tail = 0;
 		/*padding*/
-		if (stackptr & 0x3) {
-			stackptr -= (stackptr & 0x3);; /*sottraggo perchè sto scendendo nello stack*/
+		if (ustackptr & 0x3) {
+			tail = ustackptr & 0x3;
+			ustackptr -= tail; /*sottraggo perchè sto scendendo nello stack*/
 		}
-		uargs[i] = (char *)stackptr; /*mi salvo l'indirizzo dello stack user in uargs*/
-		/*prototype: int copyoutstr(const char *src, userptr_t userdest, size_t len, size_t *actual)*/
-		result = copyoutstr(kargs.buffer[i], (userptr_t)stackptr, length, &waste); /*copio da kernel a user*/
+		result = copyout((const void *)kargs[i], (userptr_t)ustackptr, length); /*copio da kernel a user*/
 		if (result) {
-			//kfree_all(uargs, argc);
-			kfree(uargs);
-			lock_release(kargs.lock);
-		} 
-
+			//kfree_all(kargs);
+			kfree(kargs);
+			kfree(kprogram);
+		}
+			
+		uargs[i] = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
+		kargs[i] = NULL; 
 	}
-
-	/*a questo punto devo memorizzare le posizioni nello stack degli argomenti*/
+	
 	for (i = 0; i < (int)argc; i++) {
-		stackptr -= sizeof(char *); //scendo di uno "slot" e in quello slot memorizzo l'indirizzo
-		result = copyout(uargs[argc-(i+1)], (userptr_t)stackptr, sizeof(char *));
+		result = copyout((const void *)uargs[argc-(i+1)], (userptr_t)ustackptr, sizeof(char *)*(i+1));
 		if (result) {
-			//kfree_all(uargs, argc);
-			kfree(uargs);
-			lock_release(kargs.lock);
-			return -result;
+			//kfree_all(kargs);
+			//kfree(kargs);
+			kfree(kprogram);
 		}
 	}
-
-	//if (stackptr % 8 == 0) stackptr -= 8;
-	//else stackptr -= 4; /*BOOOOOOOOOOOOOOOOOOOOo*/
-
-	//kfree_all(uargs, argc);
-	kfree(uargs);
+		
 	
-	
-	as_destroy(oldas); //delete old address space, enter new process*/
-	//kfree_all(kargs, argc);
+
+	//kfree_all(kargs);
 	//kfree(kargs);
 	//kfree(kprogram);
-	
-	
-	lock_release(kargs.lock);
-	
 	/* Warp to user mode. */
-/*enter_new_process(int argc, userptr_t argv, userptr_t env, vaddr_t stackptr, vaddr_t entrypoint);*/
-	enter_new_process(argc /*argc*/, (userptr_t)stackptr/*userspace addr of argv*/,
+#if 1
+	if (ustackptr % 8 == 0) {
+		stackptr = ustackptr - 8;
+	}
+	else {
+		stackptr = ustackptr - 4;
+	}
+#endif
+	enter_new_process(argc /*argc*/, (userptr_t)ustackptr/*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 
