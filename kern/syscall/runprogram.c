@@ -54,7 +54,7 @@
  
 /*progetto pds: ho aggiunto nargs e ptr come parametri*/
 int
-runprogram(char *progname, unsigned long nargs /*, char **argv*/)
+runprogram(char *progname, unsigned long nargs , char **argv)
 {
 	struct addrspace *as;
 	struct vnode *v;
@@ -105,11 +105,37 @@ runprogram(char *progname, unsigned long nargs /*, char **argv*/)
 		return result;
 	}
 	
+	/*add code for passing arguments*/
+	int length;
+	unsigned long i;
+	size_t waste;
+	char **uargv = (char **)kmalloc(sizeof(char *)*(nargs+1));
+	for (i = 0; i < nargs; i++) {
+		length = strlen(argv[i])+1;
+		uargv[i] = (char *)kmalloc(length * sizeof(char *));
+		stackptr -= length;
+		if (stackptr & 0x3) {
+			stackptr -= (stackptr & 0x3);
+		}
+		result = copyoutstr(argv[i], (userptr_t)stackptr, length, &waste);
+		if (result) {
+			return -result;
+		}
+		uargv[i] = (char *)stackptr;
+	}
+	for (i = 0; i < nargs; i++) {
+		result = copyout((const void *)uargv[nargs-(i+1)], (userptr_t)stackptr, sizeof(char *));
+		if (result) {
+			return -result;
+		}
+	}
+	if (stackptr % 8 == 0) stackptr -= 8;
+	else stackptr -=4;
 	
 	/* Warp to user mode. */
 	
 
-	enter_new_process(nargs /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(nargs /*nargs*/, (userptr_t)stackptr /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 

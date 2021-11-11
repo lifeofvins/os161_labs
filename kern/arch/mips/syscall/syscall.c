@@ -36,6 +36,10 @@
 #include <addrspace.h>
 #include <syscall.h>
 
+#if OPT_EXECV
+#include <synch.h>
+#endif
+
 
 /*
  * System call dispatcher.
