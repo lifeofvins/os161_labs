@@ -6,6 +6,7 @@ spinlock.o: ../../thread/spinlock.c ../../include/types.h \
  ../../include/threadlist.h includelinks/machine/vm.h ../../include/spl.h \
  ../../include/membar.h includelinks/machine/membar.h \
  ../../include/current.h includelinks/machine/current.h \
- ../../include/thread.h ../../include/array.h \
+ ../../include/thread.h ../../include/array.h opt-execv.h \
+ ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h
