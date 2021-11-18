@@ -63,6 +63,7 @@ static struct _processTable {
   struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
   int last_i;           /* index of last allocated pid */
   struct spinlock lk;	/* Lock for this table */
+
 } processTable;
 
 #endif
@@ -149,7 +150,7 @@ proc_end_waitpid(struct proc *proc) {
   sem_destroy(proc->p_sem);
 #else
   cv_destroy(proc->p_cv);
-  lock_destroy(proc->p_lock);
+  lock_destroy(proc->p_lock); 
 #endif
 #else
   (void)proc;
@@ -185,12 +186,9 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
 
 	proc_init_waitpid(proc,name);
-/*#if USE_SEMAPHORE_FOR_WAITPID
-	proc->p_sem = sem_create(name, 0);
-#else
-	proc->p_lock = lock_create(name);
-	proc->p_cv = cv_create(name);
-#endif*/
+	
+	proc->p_dead = false;
+
 #if OPT_FILE
 	/*create per process fileTable*/
 	/*cabodi*/
@@ -289,12 +287,6 @@ proc_destroy(struct proc *proc)
 
 	KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_spinlock);
-/*#if USE_SEMAPHORE_FOR_WAITPID
-	sem_destroy(proc->p_sem);
-#else
-	lock_destroy(proc->p_lock);
-	cv_destroy(proc->p_cv);
-#endif*/
 
 	proc_end_waitpid(proc);
 

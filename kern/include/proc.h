@@ -89,6 +89,9 @@ struct proc {
         /* G.Cabodi - 2019 - implement waitpid: synchro, and exit status */
         int p_status;                   /* status as obtained by exit() */
         pid_t p_pid;                    /* process pid */
+        
+        /*sdp project: sys__exit improvement*/
+        bool p_dead; /*is the process dead?*/
 #if USE_SEMAPHORE_FOR_WAITPID
 	struct semaphore *p_sem;
 #else

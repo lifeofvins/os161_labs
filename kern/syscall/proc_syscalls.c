@@ -25,10 +25,9 @@
 #include <test.h>
 
 
-#define PRINT 1
+#define PRINT 0
 
 
-#define DEVELOP 1 /*prova nuovi codici*/
 
 /*
  * system calls for process management
@@ -37,10 +36,12 @@ void
 sys__exit(int status)
 {
 /*TODO: check if parent exists or if parent has exited, then we even don't bother fill the exit code, since no one cares*/
-/*TODO: the exit code must be made using the MACROs in wait.h*/
-#if OPT_EXECV
-#if OPT_WAITPID
+#if OPT_WAITPID  
   struct proc *p = curproc;
+  
+  //TODO: close all open files
+  
+  
   p->p_status = status & 0xff; /* just lower 8 bits returned */
   proc_remthread(curthread);
 #if USE_SEMAPHORE_FOR_WAITPID
@@ -49,13 +50,12 @@ sys__exit(int status)
   lock_acquire(p->p_lock);
   cv_signal(p->p_cv, p->p_lock);
   lock_release(p->p_lock);
-#endif
+#endif /*SEMAPHORE*/
 #else
   /* get address space of current process and destroy */
   struct addrspace *as = proc_getas();
   as_destroy(as);
 #endif /*OPT_WAITPID*/
-#endif /*OPT_EXECV*/
   thread_exit();
 
   panic("thread_exit returned (should not happen)\n");
@@ -128,7 +128,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
   
   struct proc *parent = curproc;
   
- #if 1
+ #if 0
   kprintf("Parent process: address %p name %s pid %d\n", parent, parent->p_name, parent->p_pid);
 #endif
   

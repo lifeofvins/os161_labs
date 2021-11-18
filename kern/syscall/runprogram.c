@@ -52,20 +52,13 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
  
-/*progetto pds: ho aggiunto nargs e ptr come parametri*/
 int
-runprogram(char *progname, unsigned long nargs , char **argv)
+runprogram(char *progname)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
-	
-	
-	struct thread *thread = curthread;
-	KASSERT (thread != NULL);
-	
-	
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -104,38 +97,9 @@ runprogram(char *progname, unsigned long nargs , char **argv)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
-	
-	/*add code for passing arguments*/
-	int length;
-	unsigned long i;
-	size_t waste;
-	char **uargv = (char **)kmalloc(sizeof(char *)*(nargs+1));
-	for (i = 0; i < nargs; i++) {
-		length = strlen(argv[i])+1;
-		uargv[i] = (char *)kmalloc(length * sizeof(char *));
-		stackptr -= length;
-		if (stackptr & 0x3) {
-			stackptr -= (stackptr & 0x3);
-		}
-		result = copyoutstr(argv[i], (userptr_t)stackptr, length, &waste);
-		if (result) {
-			return -result;
-		}
-		uargv[i] = (char *)stackptr;
-	}
-	for (i = 0; i < nargs; i++) {
-		result = copyout((const void *)uargv[nargs-(i+1)], (userptr_t)stackptr, sizeof(char *));
-		if (result) {
-			return -result;
-		}
-	}
-	if (stackptr % 8 == 0) stackptr -= 8;
-	else stackptr -=4;
-	
-	/* Warp to user mode. */
-	
 
-	enter_new_process(nargs /*nargs*/, (userptr_t)stackptr /*userspace addr of argv*/,
+	/* Warp to user mode. */
+	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 
@@ -143,4 +107,3 @@ runprogram(char *progname, unsigned long nargs , char **argv)
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
-
