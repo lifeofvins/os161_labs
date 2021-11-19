@@ -77,12 +77,19 @@ struct proc *kproc;
  * Initialize support for pid/waitpid.
  */
 struct proc *
-proc_search_pid(pid_t pid) {
+proc_search_pid(pid_t pid, pid_t *retval) {
 #if OPT_WAITPID
   struct proc *p;
-  KASSERT(pid>=0&&pid<MAX_PROC);
+  if (pid < 0 || pid > MAX_PROC) {
+  	*retval = -1;
+  	return NULL;
+  }
   p = processTable.proc[pid];
-  KASSERT(p->p_pid==pid);
+  if (p->p_pid != pid) {
+  	//invece di KASSERT
+  	*retval = -1;
+  	return NULL;
+  }
   return p;
 #else
   (void)pid;
@@ -187,7 +194,7 @@ proc_create(const char *name)
 
 	proc_init_waitpid(proc,name);
 	
-	proc->p_dead = false;
+	proc->p_exited = false;
 
 #if OPT_FILE
 	/*create per process fileTable*/
@@ -286,9 +293,9 @@ proc_destroy(struct proc *proc)
 	}
 
 	KASSERT(proc->p_numthreads == 0);
-	spinlock_cleanup(&proc->p_spinlock);
 
 	proc_end_waitpid(proc);
+	spinlock_cleanup(&proc->p_spinlock);
 
 	kfree(proc->p_name);
 	

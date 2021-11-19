@@ -23,10 +23,11 @@
 #include <vnode.h>
 #include <vfs.h>
 #include <test.h>
+#include <kern/wait.h>
 
 
 #define PRINT 0
-
+#define PROJECT 1 //aggiunte per progetto sdp a syscall waitpid e exit
 
 
 /*
@@ -56,6 +57,10 @@ sys__exit(int status)
   struct addrspace *as = proc_getas();
   as_destroy(as);
 #endif /*OPT_WAITPID*/
+
+#if PROJECT
+  p->p_exited = true; //setto a true il flag che mi dice se il processo è uscito
+#endif
   thread_exit();
 
   panic("thread_exit returned (should not happen)\n");
@@ -63,24 +68,62 @@ sys__exit(int status)
 }
 
 int
-sys_waitpid(pid_t pid, userptr_t statusp, int options)
+sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 {
 
 /*PROGETTO PDS*/
 /*TODO: 
 1) argument checking: 
-	- is the status pointer properly aligned by 4?
 	- is the status pointer a valid pointer anyway (NULL, point to kernel,...)?
 	- is options valid? (more flags than WHOHANG | WUNTRACED)
-	- does the waited pid exist/valid?
 	- if exists, are we allowed to wait it? (is it our child?)
 2) after successfully get the exitcode, destroy child's process structure
 3) free child's slot in the process array
 */
 #if OPT_WAITPID
-  struct proc *p = proc_search_pid(pid);
+
+  
+  struct proc *p = proc_search_pid(pid, retval);
   int s;
+#if PROJECT   //argument check 
+  
+  if (*retval < 0) {
+  	//the pid doesn't exist
+  	return ESRCH; //the pid argument named a nonexistent process
+  }
+  //if the pid exists, are we allowed to wait for it? i.e, is it our child?
+  if (curproc != p->p_parent) {
+  	*retval = -1;
+  	return ECHILD;
+  }
+  
+  //options check
+  if (options != 0) {
+  	*retval = -1;
+  	return EINVAL;
+  }
+  //invalid pid check
+  if (pid > PID_MAX || pid < PID_MIN) {
+  	*retval = -1;
+  	return EINVAL;
+  }
+  
+  //status pointer alignment check
+  if ((int)statusp & 0x3) {
+  	statusp -= (int)statusp & 0x3; //align by 4
+  }
+  
+  //status pointer validity check
+  if (statusp == NULL) {
+  	*retval = -1;
+  	return EFAULT;
+  }
+  
+  
+  
+#else
   (void)options; /* not handled */
+#endif //PROJECT
   if (p==NULL) return -1;
   s = proc_wait(p);
   if (statusp!=NULL) 
@@ -191,13 +234,16 @@ int sys_fork(struct trapframe *ctf, pid_t *retval) {
 
 /*PROGETTO OS161*/
 void 
-kfree_all(char *argv[]) {
+kfree_args(char **kargs, size_t argc) {
 	int i;
-
-	for (i=0; argv[i]; i++)
-		kfree(argv[i]);
-
+	for (i = 0; i < (int)argc; i++) {
+		kfree(kargs[i]);
+	}
+	//kfree(*kargs);
+	kfree(kargs);
+	return;
 }
+
 
 /*PROGETTO OS161*/
 
@@ -227,7 +273,7 @@ int sys_execv(char *program, char **args) {
 	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
 	
 
-	for (argc = 0; args[argc] != NULL; argc++);
+	for (argc = 0; args[argc] != NULL; argc++); 
 	
 	if (argc >= ARG_MAX) {
 		return E2BIG;
@@ -245,15 +291,13 @@ int sys_execv(char *program, char **args) {
 		kargs[i] = (char *)kmalloc(len*sizeof(char *));
 		kargs[i+1] = NULL;
 		if (kargs[i] == NULL) {
-			///kfree_all(kargs);
-			//kfree(kargs);
+			kfree_args(kargs, i);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
 		result = copyinstr((const_userptr_t)args[i], kargs[i], len, &waste);
 		if (result) {
-			//kfree_all(kargs);
-			//kfree(kargs);
+			kfree_args(kargs, argc);
 			return -result;
 		}
 		
@@ -264,30 +308,27 @@ int sys_execv(char *program, char **args) {
 	len = strlen(program) + 1;
 	kprogram = kmalloc(len);
 	if (kprogram == NULL) {
-		//kfree(kprogram);
+		kfree(kprogram);
 		return ENOMEM;
 	}
 	result = copyinstr((const_userptr_t)program, kprogram, len, &waste);
 	if (result) {		
-		//kfree_all(kargs);
-		//kfree(kargs);
-		//kfree(kprogram);
+		kfree_args(kargs, argc);
+		kfree(kprogram);
 		return -result;
 	}
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
 	if (result) {
 		as_destroy(curproc->p_addrspace);
-		//kfree_all(kargs);
-		//kfree(kargs);
-		//kfree(kprogram);
+		kfree_args(kargs, argc);
+		kfree(kprogram);
 		return -result;
 	}
 	/*address space handling*/
 	
 	
 	/*create a new address space*/
-	//as_destroy(proc->p_addrspace);
 	newas = as_create();
 	if (newas == NULL) {
 		vfs_close(v);
@@ -334,15 +375,11 @@ int sys_execv(char *program, char **args) {
 	uargs = (char **)kmalloc(sizeof(char *) * (argc + 1));
 	if (uargs == NULL) {
 		as_destroy(curproc->p_addrspace);
-		//kfree_all(kargs);
-		//kfree(kargs);
-		//kfree(kprogram);
+		kfree_args(kargs, argc);
+		kfree(kprogram);
 
 		return ENOMEM;
 	}
-	
-
-	
 	ustackptr = stackptr;
 	for (i = 0; i < (int)argc; i++) {
 		length = strlen(kargs[i])+1;
@@ -356,22 +393,20 @@ int sys_execv(char *program, char **args) {
 		}
 		result = copyoutstr(kargs[i], (userptr_t)ustackptr, length, &waste); /*copio da kernel a user*/
 		if (result) {
-			//kfree_all(kargs);
-			//kfree(kargs);
-			//kfree(kprogram);
+			kfree_args(kargs, argc);
+			kfree(kprogram);
 			return -result;
 		}
 			
 		uargs[i] = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
-		kargs[i] = NULL; 
+		//kargs[i] = NULL; 
 	}
 	
 	for (i = 0; i < (int)argc; i++) {
 		result = copyout((const void *)uargs[argc-(i+1)], (userptr_t)ustackptr, sizeof(char*));
 		if (result) {
-			//kfree_all(kargs);
-			//kfree(kargs);
-			//kfree(kprogram);
+			kfree_args(kargs, argc);
+			kfree(kprogram);
 			return -result;
 
 		}
@@ -379,9 +414,10 @@ int sys_execv(char *program, char **args) {
 		
 	
 	as_destroy(oldas);
-	//kfree_all(kargs);
-	//kfree(kargs);
-	//kfree(kprogram);
+	
+	kfree_args(kargs, argc);
+	kfree(kprogram);
+	//kfree_args(uargs, argc);
 	/* Warp to user mode. */
 #if 1
 	if (ustackptr % 8 == 0) {

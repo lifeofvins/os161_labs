@@ -91,7 +91,7 @@ struct proc {
         pid_t p_pid;                    /* process pid */
         
         /*sdp project: sys__exit improvement*/
-        bool p_dead; /*is the process dead?*/
+        bool p_exited; /*is the process exited?*/
 #if USE_SEMAPHORE_FOR_WAITPID
 	struct semaphore *p_sem;
 #else
@@ -140,7 +140,7 @@ struct addrspace *proc_setas(struct addrspace *);
 /* wait for process termination, and return exit status */
 int proc_wait(struct proc *proc);
 /* get proc from pid */
-struct proc *proc_search_pid(pid_t pid);
+struct proc *proc_search_pid(pid_t pid, pid_t *retval);
 
 /* signal end/exit of process */
 void proc_signal_end(struct proc *proc);
