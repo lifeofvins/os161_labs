@@ -25,330 +25,365 @@
 #include <test.h>
 #include <kern/wait.h>
 
-
 #define PRINT 0
-#define PROJECT 1 //aggiunte per progetto sdp a syscall waitpid e exit
-
+#define PROJECT 1
+#define PROVA 0
 
 /*
  * system calls for process management
  */
-void
-sys__exit(int status)
+
+/***************************************SYS_EXIT****************************************************/
+void sys__exit(int status)
 {
 /*TODO: check if parent exists or if parent has exited, then we even don't bother fill the exit code, since no one cares*/
-#if OPT_WAITPID  
-  struct proc *p = curproc;
-  
-  //TODO: close all open files
-  
-  
-  p->p_status = status & 0xff; /* just lower 8 bits returned */
-  proc_remthread(curthread);
+#if OPT_WAITPID
+	struct proc *p = curproc;
+	struct proc *childp = NULL;
+	KASSERT(childp == NULL);
+
+	//TODO: close all open files
+
+	p->p_status = status & 0xff; /* just lower 8 bits returned */
+	p->p_exited = true;			 //setto a true il flag che mi dice se il processo è uscito
+
+	// proc_remthread(curthread);
 #if USE_SEMAPHORE_FOR_WAITPID
-  V(p->p_sem);
+	V(p->p_sem);
 #else
-  lock_acquire(p->p_lock);
-  cv_signal(p->p_cv, p->p_lock);
-  lock_release(p->p_lock);
+	lock_acquire(p->p_cv_lock);
+	cv_signal(p->p_cv, p->p_cv_lock);
+	lock_release(p->p_cv_lock);
 #endif /*SEMAPHORE*/
 #else
-  /* get address space of current process and destroy */
-  struct addrspace *as = proc_getas();
-  as_destroy(as);
+	/* get address space of current process and destroy */
+	struct addrspace *as = proc_getas();
+	as_destroy(as);
 #endif /*OPT_WAITPID*/
+	thread_exit();
+
+	panic("thread_exit returned (should not happen)\n");
+	(void)status; // TODO: status handling --> exit code
+}
+
+/***************************************SYS_WAITPID*************************************************/
+int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
+{
+
+#if OPT_WAITPID
+
+	KASSERT(curthread != NULL);
+	KASSERT(curproc != NULL);
+#if PROJECT
+	//options check: we only support WNOHANG
+	if (options != 0 && options != WNOHANG)
+	{
+		*retval = -1;
+		return EINVAL;
+	}
+#endif /*PROJECT*/
+	//get the process associated with the given pid
+	struct proc *p = proc_search_pid(pid, retval);
+	int s;
 
 #if PROJECT
-  p->p_exited = true; //setto a true il flag che mi dice se il processo è uscito
-#endif
-  thread_exit();
+	if (*retval < 0) {
+		//the pid doesn't exist
+		return ESRCH; //the pid argument named a nonexistent process
+	}
 
-  panic("thread_exit returned (should not happen)\n");
-  (void) status; // TODO: status handling --> exit code
-}
+	//sys_waitpid returns error if the calling process doesn't have any child
+	if (curproc->p_children->num == 0) {
+		*retval = -1;
+		return ECHILD;
+	}
+	//if the pid exists, are we allowed to wait for it? i.e, is it our child?
+	if (curproc != p->p_parent) {
+		*retval = -1;
+		return ECHILD;
+	}
 
-int
-sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
-{
+	//if WNOHANG was given, and said process is not yet dead, we immediately return 0
+	if (options == WNOHANG && !p->p_exited) {
+		*retval = 0;
+		return 0;
+	}
 
-/*PROGETTO PDS*/
-/*TODO: 
-1) argument checking: 
-	- is the status pointer a valid pointer anyway (NULL, point to kernel,...)?
-	- is options valid? (more flags than WHOHANG | WUNTRACED)
-	- if exists, are we allowed to wait it? (is it our child?)
-2) after successfully get the exitcode, destroy child's process structure
-3) free child's slot in the process array
-*/
-#if OPT_WAITPID
+	//invalid pid check
+	if (pid > PID_MAX || pid < PID_MIN) {
+		*retval = -1;
+		return EINVAL;
+	}
 
-  
-  struct proc *p = proc_search_pid(pid, retval);
-  int s;
-#if PROJECT   //argument check 
-  
-  if (*retval < 0) {
-  	//the pid doesn't exist
-  	return ESRCH; //the pid argument named a nonexistent process
-  }
-  //if the pid exists, are we allowed to wait for it? i.e, is it our child?
-  if (curproc != p->p_parent) {
-  	*retval = -1;
-  	return ECHILD;
-  }
-  
-  //options check
-  if (options != 0) {
-  	*retval = -1;
-  	return EINVAL;
-  }
-  //invalid pid check
-  if (pid > PID_MAX || pid < PID_MIN) {
-  	*retval = -1;
-  	return EINVAL;
-  }
-  
-  //status pointer alignment check
-  if ((int)statusp & 0x3) {
-  	statusp -= (int)statusp & 0x3; //align by 4
-  }
-  
-  //status pointer validity check
-  if (statusp == NULL) {
-  	*retval = -1;
-  	return EFAULT;
-  }
-  
-  
-  
+	//status pointer alignment check
+	if ((int)statusp & 0x3) {
+		statusp -= (int)statusp & 0x3; //align by 4
+	}
+
+	//status pointer validity check
+	if (statusp == NULL) {
+		*retval = -1;
+		return EFAULT;
+	}
+#endif /*PROJECT*/
+	s = proc_wait(p);
+	if (statusp != NULL)
+		*(int *)statusp = s;
+
+	return pid;
 #else
-  (void)options; /* not handled */
-#endif //PROJECT
-  if (p==NULL) return -1;
-  s = proc_wait(p);
-  if (statusp!=NULL) 
-    *(int*)statusp = s;
-
-  return pid;
-#else
-  (void)options; /* not handled */
-  (void)pid;
-  (void)statusp;
-  return -1;
+	(void)options; /* not handled */
+	(void)pid;
+	(void)statusp;
+	return -1;
 #endif
 }
 
-pid_t
-sys_getpid(void)
+/***************************************SYS_GETPID**************************************************/
+pid_t sys_getpid(void)
 {
+	pid_t pid;
 #if OPT_WAITPID
-  KASSERT(curproc != NULL);
-  return curproc->p_pid;
+	KASSERT(curproc != NULL);
+	PROC_LOCK(curproc);
+	pid = curproc->p_pid;
+	PROC_UNLOCK(curproc);
+	return pid;
 #else
-  return -1;
+	return -1;
 #endif
 }
 
 #if OPT_FORK
 /*this is the child's fork entry function*/
 static void
-call_enter_forked_process(void *tfv, unsigned long dummy) {
-  struct trapframe *tf = (struct trapframe *)tfv;
-  (void)dummy;
-  enter_forked_process(tf); 
- 
-  panic("enter_forked_process returned (should not happen)\n");
+call_enter_forked_process(void *tfv, unsigned long dummy)
+{
+	struct trapframe *tf = (struct trapframe *)tfv;
+	(void)dummy;
+	enter_forked_process(tf);
+
+	panic("enter_forked_process returned (should not happen)\n");
 }
 
-
 /*nella sys_fork entra solo il padre*/
-int sys_fork(struct trapframe *ctf, pid_t *retval) {
-  struct trapframe *tf_child;
-  struct proc *newp;
-  int result;
 
-  KASSERT(curproc != NULL); /*curproc sarebbe il padre*/
-  
-  struct proc *parent = curproc;
-  
- #if 0
+/***************************************SYS_FORK****************************************************/
+/*nella sys_fork entra solo il padre*/
+int sys_fork(struct trapframe *ctf, pid_t *retval)
+{
+	struct trapframe *tf_child;
+	struct proc *newp;
+	int result;
+	int new_pid = 0;
+	struct proc *parent = curproc;
+	struct thread *thread = curthread;
+
+	KASSERT(curproc != NULL); /*curproc sarebbe il padre*/
+	KASSERT(thread != NULL);
+
+	/*TODO: check if there are already too many processes on the system*/
+	if (false) {
+		return ENPROC;
+	}
+
+	/*check if the current user already has too many processes*/
+	if (false) {
+		return ENPROC;
+	}
+
+#if 0
   kprintf("Parent process: address %p name %s pid %d\n", parent, parent->p_name, parent->p_pid);
 #endif
-  
-  struct thread *thread = curthread;
-  KASSERT(thread != NULL);
-  newp = proc_create_runprogram(parent->p_name);
-  if (newp == NULL) {
-    return ENOMEM;
-  }
+	/*create child process*/
+	newp = proc_create_runprogram(parent->p_name);
+	if (newp == NULL) {
+		return ENOMEM;
+	}
+	new_pid = newp->p_pid;
+	/*check if generated pid is valid*/
+	if (new_pid < PID_MIN || new_pid > PID_MAX) {
+		proc_destroy(newp);
+		return EINVAL;
+	}
 
-  tf_child = kmalloc(sizeof(struct trapframe)); /*allocation*/
-  if(tf_child == NULL){
-    proc_destroy(newp);
-    return ENOMEM; 
-  }
-  
-  /*first of all we have to copy parent's trap frame and pass it to child thread*/
-  memcpy(tf_child, ctf, sizeof(struct trapframe)); 
-  
-  /*then we have to copy parent's address space*/
-    as_copy(curproc->p_addrspace, &(newp->p_addrspace));
-  if(newp->p_addrspace == NULL){
-    proc_destroy(newp); 
-    return ENOMEM; /*out of memory: a memory allocation failed. This normally means that
-    		    *a process has used up all the memory available to it. 
-    		    *it may also mean that memory allocation within the kernel has failed.
-    		    */
-  }	
-  
+	/*then we have to copy parent's address space*/
+	result = as_copy(curproc->p_addrspace, &(newp->p_addrspace));
+	if (result || newp->p_addrspace == NULL) {
+		proc_destroy(newp);
+		return -result;
+	}
 
-  /*linking parent/child, so that child terminated 
+	/*linking parent/child, so that child terminated 
      on parent exit */
-  newp->p_parent = parent; /*il figlio punta al padre*/
-  proc_add_child(parent, newp);
-  /*aggiungo il figlio alla lista dei processi figli del padre*/
-  /*qui fa partire il figlio*/
-  result = thread_fork(
-		 curthread->t_name, newp,
-		 call_enter_forked_process, 
-		 (void *)tf_child, (unsigned long)0/*unused*/);
+	newp->p_parent = parent; /*il figlio punta al padre*/
+	proc_add_child(parent, newp);
+	/*aggiungo il figlio alla lista dei processi figli del padre*/
+	/*qui fa partire il figlio*/
 
-  if (result){
-    proc_destroy(newp);
-    kfree(tf_child);
-    return ENOMEM;
-  }
-  
+	tf_child = kmalloc(sizeof(struct trapframe)); /*allocation*/
+	if (tf_child == NULL) {
+		proc_destroy(newp);
+		return ENOMEM;
+	}
 
- 
-  *retval = newp->p_pid; /*parent returns with child's pid immediately*/
-  //newp->p_pid = 0; /*child has pid = 0*/
-  
-  /*la fork ritorna il pid del figlio se sono nel padre, zero se sono nel figlio*/
-  
-  return 0;
+	/*copy parent's trap frame and pass it to child thread*/
+	memcpy(tf_child, ctf, sizeof(struct trapframe));
+	result = thread_fork(
+		curthread->t_name, newp,
+		call_enter_forked_process,
+		(void *)tf_child, (unsigned long)0 /*unused*/);
+
+	if (result) {
+		proc_destroy(newp);
+		kfree(tf_child);
+		return ENOMEM;
+	}
+	/*copy cwd*/
+	if (newp->p_cwd != NULL) {
+		VOP_INCREF(parent->p_cwd);
+		newp->p_cwd = parent->p_cwd;
+	}
+	/*not sure about inserting sys_waitpid inside fork*/
+	*retval = newp->p_pid; /*parent returns with child's pid immediately*/
+	// if (curproc == parent) {
+	// sys_waitpid(newp->p_pid, (userptr_t)newp->p_status, 0, retval);
+	// }
+	return 0;
 }
 #endif /*OPT_FORK*/
 
 #if OPT_EXECV
 
 /*PROGETTO OS161*/
-void 
-kfree_args(char **kargs, size_t argc) {
-	int i;
-	for (i = 0; i < (int)argc; i++) {
-		kfree(kargs[i]);
+
+void kfree_args(void **args)
+{
+	int i = 0;
+	while (args[i] != NULL)
+	{
+		args[i] = NULL;
+		kfree(args[i]);
+		i++;
 	}
-	//kfree(*kargs);
-	kfree(kargs);
+	kfree(args[i]); //NULL value
+	kfree(args);
 	return;
 }
 
-
 /*PROGETTO OS161*/
 
-int sys_execv(char *program, char **args) {
+/***************************************SYS_EXECV***************************************************/
+int sys_execv(char *program, char **args)
+{
 
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
 	size_t argc, len, waste;
 	int i;
-	
+
 	/*strutture kernel*/
 	char *kprogram;
 	char **kargs;
-	
+
 	struct addrspace *oldas;
 	struct addrspace *newas;
 	struct proc *proc = curproc;
-	
+
 	KASSERT(proc != NULL); //warning
-	
+
 	/*verifico che entrambi gli argomenti passati ad execv siano puntatori validi*/
-	if (program == NULL || args == NULL) {
+	if (program == NULL || args == NULL)
+	{
 		return EFAULT;
 	}
-	
-	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
-	
 
-	for (argc = 0; args[argc] != NULL; argc++); 
-	
-	if (argc >= ARG_MAX) {
+	/*trovo la dimensione del vettore: ciclo finchè non trovo un puntatore a NULL*/
+
+	for (argc = 0; args[argc] != NULL; argc++)
+		;
+
+	if (argc >= ARG_MAX)
+	{
 		return E2BIG;
 	}
-	
+
 	/*alloco il vettore*/
-	kargs = (char **)kmalloc(argc * sizeof(char**));
-	if (kargs == NULL) {
+	kargs = (char **)kmalloc(argc * sizeof(char **));
+	if (kargs == NULL)
+	{
 		return ENOMEM;
 	}
-	
+
 	/*alloco ogni riga del vettore*/
-	for (i = 0; i < (int)argc; i++) {
+	for (i = 0; i < (int)argc; i++)
+	{
 		len = strlen(args[i]) + 1;
-		kargs[i] = (char *)kmalloc(len*sizeof(char *));
-		kargs[i+1] = NULL;
-		if (kargs[i] == NULL) {
-			kfree_args(kargs, i);
+		kargs[i] = (char *)kmalloc(len * sizeof(char *));
+		if (kargs[i] == NULL)
+		{
+			kfree_args((void **)kargs);
 			return ENOMEM;
 		}
 		/*una volta allocato l'elemento i-esimo del vettore facico copyin da user a kernel*/
 		result = copyinstr((const_userptr_t)args[i], kargs[i], len, &waste);
-		if (result) {
-			kfree_args(kargs, argc);
+		if (result)
+		{
+			kfree_args((void **)kargs);
 			return -result;
 		}
-		
 	}
-	
-	
+
+	kargs[i] = NULL;
 	/*faccio la stessa cosa col nome del programma*/
 	len = strlen(program) + 1;
 	kprogram = kmalloc(len);
-	if (kprogram == NULL) {
+	if (kprogram == NULL)
+	{
 		kfree(kprogram);
 		return ENOMEM;
 	}
 	result = copyinstr((const_userptr_t)program, kprogram, len, &waste);
-	if (result) {		
-		kfree_args(kargs, argc);
+	if (result)
+	{
+		kfree_args((void **)kargs);
 		kfree(kprogram);
 		return -result;
 	}
 	/* Open the file. */
 	result = vfs_open(kprogram, O_RDONLY, 0, &v);
-	if (result) {
+	if (result)
+	{
 		as_destroy(curproc->p_addrspace);
-		kfree_args(kargs, argc);
+		kfree_args((void **)kargs);
 		kfree(kprogram);
 		return -result;
 	}
 	/*address space handling*/
-	
-	
+
 	/*create a new address space*/
 	newas = as_create();
-	if (newas == NULL) {
+	if (newas == NULL)
+	{
 		vfs_close(v);
 		return ENOMEM;
 	}
-	
+
 	/*Switch to it and activate it*/
 	oldas = proc_setas(newas); //proc_setas ritorna il vecchio as
 	as_activate();
-	
+
 	/*Load the executable*/
 	result = load_elf(v, &entrypoint);
-	if  (result) {
+	if (result)
+	{
 		/*p_addrspace will go away when curproc is destroyed*/
 		vfs_close(v);
 
 		return result;
 	}
 
-	
 /*SO FAR SO GOOD*/
 /*a questo punto del codice ci arrivano tutti i processi figli creati dalle fork chiamate prima della execv in testbin/farm*/
 /*se sposto più in giù nel codice questa kprintf non ci arrivano tutti i figli*/
@@ -360,76 +395,80 @@ int sys_execv(char *program, char **args) {
 	vfs_close(v);
 	/* Define the user stack in the address space */
 	result = as_define_stack(newas, &stackptr);
-	if (result) {
+	if (result)
+	{
 		/* p_addrspace will go away when curproc is destroyed */
 		return -result;
 	}
-	
+
 	/*devo tornare da kernel a user: qui devo usare il padding*/
 	/*strutture user dopo kernel*/
 	char **uargs;
 	vaddr_t ustackptr; /*user stack pointer*/
 	int length, tail;
-	
 
 	uargs = (char **)kmalloc(sizeof(char *) * (argc + 1));
-	if (uargs == NULL) {
+	if (uargs == NULL)
+	{
 		as_destroy(curproc->p_addrspace);
-		kfree_args(kargs, argc);
+		kfree_args((void **)kargs);
 		kfree(kprogram);
 
 		return ENOMEM;
 	}
 	ustackptr = stackptr;
-	for (i = 0; i < (int)argc; i++) {
-		length = strlen(kargs[i])+1;
-		uargs[i] = (char *)kmalloc(length*sizeof(char *));
+	for (i = 0; i < (int)argc; i++)
+	{
+		length = strlen(kargs[i]) + 1;
+		uargs[i] = (char *)kmalloc(length * sizeof(char *));
 		ustackptr -= length;
 		tail = 0;
 		/*padding*/
-		if (ustackptr & 0x3) {
+		if (ustackptr & 0x3)
+		{
 			tail = ustackptr & 0x3;
 			ustackptr -= tail; /*sottraggo perchè sto scendendo nello stack*/
 		}
 		result = copyoutstr(kargs[i], (userptr_t)ustackptr, length, &waste); /*copio da kernel a user*/
-		if (result) {
-			kfree_args(kargs, argc);
+		if (result)
+		{
+			kfree_args((void **)kargs);
 			kfree(kprogram);
 			return -result;
 		}
-			
-		uargs[i] = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
-		//kargs[i] = NULL; 
-	}
-	
-	for (i = 0; i < (int)argc; i++) {
-		result = copyout((const void *)uargs[argc-(i+1)], (userptr_t)ustackptr, sizeof(char*));
-		if (result) {
-			kfree_args(kargs, argc);
-			kfree(kprogram);
-			return -result;
 
+		uargs[i] = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
+	}
+
+	for (i = 0; i < (int)argc; i++)
+	{
+		result = copyout((const void *)uargs[argc - (i + 1)], (userptr_t)ustackptr, sizeof(char *));
+		if (result)
+		{
+			kfree_args((void **)kargs);
+			kfree(kprogram);
+			return -result;
 		}
 	}
-		
-	
+
+	uargs[i] = NULL;
 	as_destroy(oldas);
-	
-	kfree_args(kargs, argc);
+
+	kfree_args((void **)kargs);
 	kfree(kprogram);
-	//kfree_args(uargs, argc);
+	kfree_args((void **)uargs); //non funziona perchè sono indirizzi user e si blocca su KASSERT di kfree perchè non è multiplo di pagina
 	/* Warp to user mode. */
-#if 1
-	if (ustackptr % 8 == 0) {
+	if (ustackptr % 8 == 0)
+	{
 		stackptr = ustackptr - 8;
 	}
-	else {
+	else
+	{
 		stackptr = ustackptr - 4;
 	}
-#endif
-	enter_new_process(argc /*argc*/, (userptr_t)ustackptr/*userspace addr of argv*/,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
+	enter_new_process(argc /*argc*/, (userptr_t)ustackptr /*userspace addr of argv*/,
+					  NULL /*userspace addr of environment*/,
+					  stackptr, entrypoint);
 
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");

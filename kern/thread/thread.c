@@ -583,6 +583,7 @@ thread_fork(const char *name,
 	}
 	thread_checkstack_init(newthread);
 
+	//grace
 	/*
 	 * Now we clone various fields from the parent thread.
 	 */
@@ -612,7 +613,6 @@ thread_fork(const char *name,
 	/* Set up the switchframe so entrypoint() gets called */
 	switchframe_init(newthread, entrypoint, data1, data2);
 
-	/* Lock the current cpu's run queue and make the new thread runnable */
 #if OPT_FORK
 	/*copio la fileTable del padre subito prima di rendere runnable il thread*/
 	
@@ -620,6 +620,7 @@ thread_fork(const char *name,
 	proc_file_table_copy(parent, proc);
 	spinlock_release(&parent->p_spinlock);
 #endif
+	/* Lock the current cpu's run queue and make the new thread runnable */
 	thread_make_runnable(newthread, false);
 
 	return 0;

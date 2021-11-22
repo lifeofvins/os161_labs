@@ -69,7 +69,7 @@ struct vnode;
 #if OPT_WAITPID
 /* G.Cabodi - 2019 - implement waitpid: 
    synch with semaphore (1) or cond.var.(0) */
-#define USE_SEMAPHORE_FOR_WAITPID 1
+#define USE_SEMAPHORE_FOR_WAITPID 0
 #endif
 
 
@@ -92,11 +92,12 @@ struct proc {
         
         /*sdp project: sys__exit improvement*/
         bool p_exited; /*is the process exited?*/
+        struct lock *p_lock;
 #if USE_SEMAPHORE_FOR_WAITPID
 	struct semaphore *p_sem;
 #else
-        struct lock *p_lock;
         struct cv *p_cv;
+        struct lock *p_cv_lock;
 #endif
 #endif
 
@@ -158,4 +159,7 @@ void proc_add_child(struct proc *parent, struct proc *child);
 struct addrspace *curproc_getas(void);
 struct addrspace *curproc_setas(struct addrspace *newas);
 //#endif
+
+#define PROC_LOCK(x) (lock_acquire( (x) -> p_lock))
+#define PROC_UNLOCK(x) (lock_release( (x) -> p_lock))
 #endif /* _PROC_H_ */

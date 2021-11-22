@@ -54,6 +54,8 @@
 
 #define MAXMENUARGS  16
 
+#define PROJECT 0 /*support for waitpid, sdp project*/
+
 ////////////////////////////////////////////////////////////
 //
 // Command menu functions
@@ -121,7 +123,6 @@ common_prog(int nargs, char **args)
 	
 	int exit_code;
 
-	//int retpid; /*se la waitpid non fallisce ritorna il pid del processo*/
 
 	/* Create a process for the new program to run in. */
 	/*è stato allocato il processo ma non è stato ancora eseguito niente*/
@@ -147,9 +148,16 @@ common_prog(int nargs, char **args)
 	 */
 	 /*LAB04: devo gestire waitpid --> exit_code = proc_wait(proc);*/
 #if OPT_WAITPID
+#if PROJECT
+	userptr_t statusp = NULL;
+	pid_t pid = sys_getpid();
+	int retpid = sys_waitpid(pid, statusp, 0, (pid_t *)&exit_code);
+	return retpid;
+#else
 	exit_code = proc_wait(proc);
 	return exit_code;
-#endif
+#endif /*PROJECT*/
+#endif /*OPT_WAITPID*/
 	return 0;
 }
 

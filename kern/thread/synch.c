@@ -301,8 +301,8 @@ cv_create(const char *name)
 	/*LAB3: creo wchan e lock associati alla cv*/
 	cv->cv_wchan = wchan_create(cv->cv_name);
 	if (cv->cv_wchan == NULL) {
-		kfree(cv->cv_wchan);
 		kfree(cv->cv_name);
+		kfree(cv);
 		return NULL;
 	}
 	
@@ -318,8 +318,8 @@ cv_destroy(struct cv *cv)
 
 	// add stuff here as needed
 #if OPT_SYNCH
-	wchan_destroy(cv->cv_wchan);
 	spinlock_cleanup(&cv->cv_spinlock);
+	wchan_destroy(cv->cv_wchan);
 #endif
 	kfree(cv->cv_name);
 	kfree(cv);
@@ -333,8 +333,8 @@ cv_wait(struct cv *cv, struct lock *lock)
 #if OPT_SYNCH	
 	/*LAB3: implemento cv_wait con wchan e spinlock*/
 	/*schema: rilascio il lock, vado in sleep, riacquisisco il lock*/
-	KASSERT(cv != NULL);
 	KASSERT(lock != NULL);
+	KASSERT(cv != NULL);
 	KASSERT(lock_do_i_hold(lock)); /*fermati se non possiedo il lock*/
 	
 	/*acquisisco lo spinlock */

@@ -79,7 +79,8 @@ pid_t sys_getpid(void);
 int sys_fork(struct trapframe *ctf, pid_t *retval);
 #endif /*OPT_FORK*/
 #if OPT_EXECV
-void kfree_args(char **kargs, size_t argc);
+//void kfree_args(char **kargs, size_t argc);
+void kfree_args(void **args);
 int sys_execv(char *program, char **args);
 #endif /*OPT_EXECV*/
 #endif /*OPT_SYSCALLS*/

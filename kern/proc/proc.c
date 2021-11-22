@@ -56,6 +56,7 @@
 
 #if OPT_WAITPID
 #include <synch.h>
+#include <kern/wait.h>
 
 #define MAX_PROC 100
 static struct _processTable {
@@ -126,11 +127,12 @@ proc_init_waitpid(struct proc *proc, const char *name) {
   }
   proc->p_status = 0;
 
+  proc->p_lock = lock_create(name);
 #if USE_SEMAPHORE_FOR_WAITPID
   proc->p_sem = sem_create(name, 0);
 #else
+  proc->p_cv_lock = lock_create("cv_lock");
   proc->p_cv = cv_create(name);
-  proc->p_lock = lock_create(name);
 #endif
 #else
   (void)proc;
@@ -156,9 +158,10 @@ proc_end_waitpid(struct proc *proc) {
 #if USE_SEMAPHORE_FOR_WAITPID
   sem_destroy(proc->p_sem);
 #else
+  lock_destroy(proc->p_cv_lock);
   cv_destroy(proc->p_cv);
-  lock_destroy(proc->p_lock); 
 #endif
+  lock_destroy(proc->p_lock); 
 #else
   (void)proc;
 #endif
@@ -192,7 +195,7 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
-	proc_init_waitpid(proc,name);
+	proc_init_waitpid(proc,name); //in questa funzione viene aggiunto alla tabella dei proccessi
 	
 	proc->p_exited = false;
 
@@ -484,6 +487,8 @@ proc_setas(struct addrspace *newas)
 
 
         /* G.Cabodi - 2019 - support for waitpid */
+
+/***********************************PROC_WAIT**************************************************/
 int 
 proc_wait(struct proc *proc)
 {
@@ -497,11 +502,18 @@ proc_wait(struct proc *proc)
 #if USE_SEMAPHORE_FOR_WAITPID
         P(proc->p_sem);
 #else
-        lock_acquire(proc->p_lock);
-        cv_wait(proc->p_cv, proc->p_lock);
-        lock_release(proc->p_lock);
+	lock_acquire(proc->p_cv_lock);
+        cv_wait(proc->p_cv, proc->p_cv_lock);
+        lock_release(proc->p_cv_lock);
 #endif
-        return_status = proc->p_status;
+	//at this point the child should be dead
+	KASSERT(proc->p_exited);
+	
+	//copy its exit code to the userland
+	
+        return_status = _MKWAIT_EXIT(proc->p_status);
+        
+        //unlock and destroy
         proc_destroy(proc);
         return return_status;
 #else
@@ -519,9 +531,9 @@ proc_signal_end(struct proc *proc) {
 #if USE_SEMAPHORE_FOR_WAITPID
 	V(proc->p_sem);
 #else
-	lock_acquire(proc->p_lock);
+	lock_acquire(proc->p_cv_lock);
 	cv_signal(proc->p_cv, proc->p_lock);
-	lock_release(proc->p_lock);
+	lock_release(proc->p_cv_lock);
 #endif 
 }
 
