@@ -123,6 +123,7 @@ main(void)
 
 	/* rewind the file */
 	if (lseek(file, 0, SEEK_SET)) {
+		printf("Error lseek\n");
 		err(1, "lseek");
 	}
 
@@ -157,7 +158,7 @@ main(void)
 		err(1, "Unexpected error reopening the file");
 	}
 
-	printf("Succeeded!\n");
+	printf("Succeeded lseek!\n");
 
 	return 0;
 }

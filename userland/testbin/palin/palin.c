@@ -82,6 +82,7 @@ a canal - Panama!
 /* The palindrome below is a quadruple concatenation of the above */
 
 #include <stdio.h>
+#include <stdlib.h> //for exit function
 #include <string.h>
 
 char palindrome[8000] =

@@ -502,8 +502,10 @@ proc_wait(struct proc *proc)
 #if USE_SEMAPHORE_FOR_WAITPID
         P(proc->p_sem);
 #else
-	lock_acquire(proc->p_cv_lock);
-        cv_wait(proc->p_cv, proc->p_cv_lock);
+		lock_acquire(proc->p_cv_lock);
+		while(!proc->p_exited) {
+        	cv_wait(proc->p_cv, proc->p_cv_lock);
+		}
         lock_release(proc->p_cv_lock);
 #endif
 	//at this point the child should be dead

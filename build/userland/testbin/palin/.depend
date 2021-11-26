@@ -5,4 +5,5 @@ $(MYBUILDDIR)/palin.o: \
  $(INSTALLTOP)/include/kern/machine/types.h \
  $(INSTALLTOP)/include/types/size_t.h \
  $(INSTALLTOP)/include/sys/null.h \
+ $(INSTALLTOP)/include/stdlib.h \
  $(INSTALLTOP)/include/string.h

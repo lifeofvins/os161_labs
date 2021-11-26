@@ -129,6 +129,12 @@ syscall(struct trapframe *tf)
 	    	/*just ignore: do nothing*/
 	    	retval = 0;
 	    	break;
+		case SYS_lseek:
+			err = sys_lseek((int)tf->tf_a0,
+					(off_t)tf->tf_a1,
+					(int)tf->tf_a2,
+					(int *)&retval);
+			kprintf("sys_lseek returned %d\n", err);
 #endif
 	    case SYS_write:
 	        retval = sys_write((int)tf->tf_a0,
@@ -155,7 +161,7 @@ syscall(struct trapframe *tf)
 				(int)tf->tf_a2,
 				(pid_t *)&retval);
                 if (retval<0) err = ENOSYS; 
-		else err = 0;
+				else err = 0;
                 break;
 	    case SYS_getpid:
 	        retval = sys_getpid();

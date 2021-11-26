@@ -355,7 +355,6 @@ cv_wait(struct cv *cv, struct lock *lock)
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
-	// Write this
 #if OPT_SYNCH
 	/*LAB3: implemento cv_signal con wchan e spinlock*/
 	KASSERT(cv != NULL);

@@ -12,6 +12,7 @@
 #include <syscall.h>
 #include <current.h>
 #include <lib.h>
+#include "opt-file.h"
 
 #if OPT_FILE
 
@@ -21,12 +22,14 @@
 #include <limits.h>
 #include <uio.h>
 #include <proc.h>
+#include <kern/seek.h>
+#include <kern/stat.h>
 
 /*max num of system wide open file*/
 #define SYSTEM_OPEN_MAX 10*OPEN_MAX
 
 
-#define USE_KERNEL_BUFFER 0 //cabodi
+#define USE_KERNEL_BUFFER 1 //cabodi
 
 
 struct openfile {
@@ -291,6 +294,202 @@ sys_read(int fd, userptr_t buf_ptr, size_t size)
   }
 
   return (int)size;
+}
+/**
+ * Implementation of the dup2 system call.
+ * 
+ * It manages the cases in which bad file descriptors
+ * are passed as parameters.
+ * 
+ * Parameters:
+ * - old_fd: the old file descriptor
+ * - new_fd: the new file descriptor
+ * - ret_val: integer pointer set to 0 if it's all
+ *            gone ok, -1 otherwise.
+ * 
+ * Example of usage:
+ *      int logfd = open("logfile", O_WRONLY);
+ *      dup2(logfd, STDOUT_FILENO); 
+ *      close(logfd);
+ *      printf("Hello, OS161.\n");
+ * 
+ * 
+ * Return value:
+ * 0: operation completed successfully
+ * error code if there's been an error. 
+ */
+
+int
+sys_dup2(int old_fd, int new_fd, int *ret_val)
+{
+    struct openfile of;
+    /**
+     * Error handling:
+     * File descriptors cannot be negative integer numbers
+     * or integer greater than the value specified in OPEN_MAX constant.
+     * Moreover, there's a function which checks whether the
+     * old_fd is a actually existing inside the process filetable or not.
+     */
+    if (!is_valid_fd(old_fd) || !is_valid_fd(new_fd))
+    {
+        *ret_val = -1;
+        return EBADF;
+    }
+
+	//TODO return EMFILE if the process file table was full, or a process-specific limit on open files was reached
+
+    /**
+     * Old file descriptor equal to the new one.
+     * There's no operation to be done, but
+     * ret_val's content is set to 0xFF so that
+     * it's possible to know that old_fd and new_fd
+     * are the same.
+     * Actually useless.
+     * Probably it will be removed.
+     */
+    if (old_fd == new_fd)
+    {
+        *ret_val = 0xFF;
+		//*ret_val = new_fd;
+
+		/*from linux man page: if oldf == newf then dup2 returns newf*/
+        return 0;
+    }
+
+    /* Check whether new_fd is previously opened and eventually close it */
+    if (systemFileTable[new_fd].vn != NULL)
+    {
+        sys_close(new_fd);
+    }
+
+    // /* Open the new_fd descriptor */
+    // if (sys_open(new_fd) == -1)
+    // {
+    //     *ret_val = -1;
+    //     return EBADF;
+    // }
+
+    /* Let the entry related to new_fd point to the old_fd's one */
+    of = systemFileTable[old_fd];
+    systemFileTable[new_fd].vn = of.vn;
+    systemFileTable[new_fd].mode = of.mode;
+    systemFileTable[new_fd].offset = of.offset;
+    systemFileTable[new_fd].ref_count = of.ref_count;
+
+    return 0;
+}
+
+/**
+ * Implementation of the lseek system call.
+ * 
+ * Parameters:
+ * - fd: the file descriptor
+ * - offset: an integer representing the offset
+ * - whence: it can be SEEK_CUR, SEEK_SET or SEEK_END
+ * - ret_val: pointer to the value returned to syscall.c switch-case call
+ * 
+ * Return value:
+ * - 0, on success
+ * - error code, otherwise
+ */
+int
+sys_lseek(int fd, off_t offset, int whence, int *ret_val)
+{
+
+	//TODO handle 64-bit parameter and 64-bit return value
+    off_t actual_offset = 0;
+    off_t dis;
+    struct openfile *of;
+    struct stat stat;
+
+    spinlock_acquire(&curproc->p_spinlock);
+    /* Checks whether the file descriptor is valid */
+    if (!is_valid_fd(fd))
+    {
+        *ret_val = -1;
+        spinlock_release(&curproc->p_spinlock);
+        return EBADF;
+    }
+
+    /* Checks whether the whence parameter is valid */
+    if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
+    {
+        *ret_val = -1;
+        spinlock_release(&curproc->p_spinlock);
+        return EINVAL;
+    }
+
+    /* If the offset is zero, we can exit */
+    if(offset == 0)
+    {
+        *ret_val = 0;
+        spinlock_release(&curproc->p_spinlock);
+        return 0;
+    }
+
+    of = &systemFileTable[fd];
+    
+    /**
+     * SEEK_SET
+     * The offset will simply be the one
+     * passed as parameter.
+     */
+    if(whence == SEEK_SET)
+    {
+        actual_offset = offset;
+    }
+    /**
+     * SEEK_CUR
+     * We need to compute the displacement
+     * from the current position adding the
+     * offset passed as parameter.
+     */
+    else if(whence == SEEK_CUR)
+    {
+        actual_offset = of->offset + offset;
+    }
+    /**
+     * SEEK_END
+     * In this case, we need to retrieve the
+     * information about the length of the
+     * file using a macro defined in vnode.h
+     * called VOP_STAT.
+     * Then, we will compute the actual_offset following this schema:
+     * 
+     * <------------------file_length------------------->
+     * |start------{current_position}---x<-(offset)->end|
+     * <------------------->
+     * <--------file_length+offset------------>
+     */
+    else if(whence == SEEK_END)
+    {
+        VOP_STAT(of->vn, &stat);
+        dis = stat.st_size;
+        actual_offset = dis + offset;
+    }
+
+    of->offset = actual_offset;
+    
+    spinlock_release(&curproc->p_spinlock);
+    return 0;
+}
+
+/**
+ * Checks whether the file descriptor has been really allocated.
+ * 
+ * Parameter:
+ * - fd: file descriptor to be tested
+ * 
+ * Return value:
+ * - 0, if fd is not valid
+ * - whatever else otherwise
+ */
+int
+is_valid_fd(int fd)
+{
+    if (fd < 0 || fd > OPEN_MAX)
+        return 0;
+    return !(curproc->fileTable[fd]->vn == NULL);
 }
 
 

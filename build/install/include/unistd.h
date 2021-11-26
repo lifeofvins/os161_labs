@@ -118,7 +118,9 @@ pid_t waitpid(pid_t pid, int *returncode, int flags);
  * arg is the file mode used for creation. Unless you're implementing
  * security and permissions, you can ignore it.
  */
-int open(const char *filename, int flags, ...);
+ 
+ /*MI SERVONO PER IL LAB 5*/
+int open(const char *filename, int flags, ...); /*chiama la sys_open*/
 ssize_t read(int filehandle, void *buf, size_t size);
 ssize_t write(int filehandle, const void *buf, size_t size);
 int close(int filehandle);

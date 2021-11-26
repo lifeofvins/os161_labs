@@ -45,13 +45,13 @@ void sys__exit(int status)
 	//TODO: close all open files
 
 	p->p_status = status & 0xff; /* just lower 8 bits returned */
-	p->p_exited = true;			 //setto a true il flag che mi dice se il processo è uscito
 
 	// proc_remthread(curthread);
 #if USE_SEMAPHORE_FOR_WAITPID
 	V(p->p_sem);
 #else
 	lock_acquire(p->p_cv_lock);
+	p->p_exited = true;			 //setto a true il flag che mi dice se il processo è uscito
 	cv_signal(p->p_cv, p->p_cv_lock);
 	lock_release(p->p_cv_lock);
 #endif /*SEMAPHORE*/
@@ -116,13 +116,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 	}
 
 	//status pointer alignment check
-	if ((int)statusp & 0x3) {
-		statusp -= (int)statusp & 0x3; //align by 4
-	}
-
-	//status pointer validity check
-	if (statusp == NULL) {
-		*retval = -1;
+	if ((int)statusp % 4 != 0) {
 		return EFAULT;
 	}
 #endif /*PROJECT*/
@@ -162,6 +156,7 @@ call_enter_forked_process(void *tfv, unsigned long dummy)
 	struct trapframe *tf = (struct trapframe *)tfv;
 	(void)dummy;
 	enter_forked_process(tf);
+	/*enter_forked_process is defined in syscall.c*/
 
 	panic("enter_forked_process returned (should not happen)\n");
 }
@@ -208,6 +203,14 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	}
 
 	/*then we have to copy parent's address space*/
+	tf_child = kmalloc(sizeof(struct trapframe)); /*allocation*/
+	if (tf_child == NULL) {
+		proc_destroy(newp);
+		return ENOMEM;
+	}
+
+	/*copy parent's trap frame and pass it to child thread*/
+	memcpy(tf_child, ctf, sizeof(struct trapframe));
 	result = as_copy(curproc->p_addrspace, &(newp->p_addrspace));
 	if (result || newp->p_addrspace == NULL) {
 		proc_destroy(newp);
@@ -217,18 +220,8 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	/*linking parent/child, so that child terminated 
      on parent exit */
 	newp->p_parent = parent; /*il figlio punta al padre*/
-	proc_add_child(parent, newp);
-	/*aggiungo il figlio alla lista dei processi figli del padre*/
+	proc_add_child(parent, newp); /*aggiungo il figlio alla lista dei processi figli del padre*/
 	/*qui fa partire il figlio*/
-
-	tf_child = kmalloc(sizeof(struct trapframe)); /*allocation*/
-	if (tf_child == NULL) {
-		proc_destroy(newp);
-		return ENOMEM;
-	}
-
-	/*copy parent's trap frame and pass it to child thread*/
-	memcpy(tf_child, ctf, sizeof(struct trapframe));
 	result = thread_fork(
 		curthread->t_name, newp,
 		call_enter_forked_process,
@@ -239,16 +232,10 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 		kfree(tf_child);
 		return ENOMEM;
 	}
-	/*copy cwd*/
-	if (newp->p_cwd != NULL) {
-		VOP_INCREF(parent->p_cwd);
-		newp->p_cwd = parent->p_cwd;
-	}
-	/*not sure about inserting sys_waitpid inside fork*/
+
 	*retval = newp->p_pid; /*parent returns with child's pid immediately*/
-	// if (curproc == parent) {
-	// sys_waitpid(newp->p_pid, (userptr_t)newp->p_status, 0, retval);
-	// }
+	
+	/*not sure about inserting sys_waitpid inside fork*/
 	return 0;
 }
 #endif /*OPT_FORK*/
