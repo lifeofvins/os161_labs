@@ -48,6 +48,7 @@ void sys__exit(int status)
 
 	// proc_remthread(curthread);
 #if USE_SEMAPHORE_FOR_WAITPID
+	p->p_exited = true;	
 	V(p->p_sem);
 #else
 	lock_acquire(p->p_cv_lock);

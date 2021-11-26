@@ -503,6 +503,7 @@ proc_wait(struct proc *proc)
         P(proc->p_sem);
 #else
 		lock_acquire(proc->p_cv_lock);
+		/*condition on which the parent proc has to wait*/
 		while(!proc->p_exited) {
         	cv_wait(proc->p_cv, proc->p_cv_lock);
 		}

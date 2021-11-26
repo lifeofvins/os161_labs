@@ -45,6 +45,7 @@
 #include <syscall.h>
 #include <test.h>
 #include <copyinout.h>
+#include <synch.h>
 
 #include "opt-file.h"
 /*
@@ -53,7 +54,76 @@
  *
  * Calls vfs_open on progname and thus may destroy it.
  */
- 
+#define ARGS 1
+
+#if ARGS
+struct argvdata {
+	char *buffer;
+	char *bufend;
+	size_t *offsets;
+	int nargs;
+	struct lock *lock;
+};
+
+static struct argvdata argdata;
+
+static 
+int
+copyout_args(struct argvdata *ad, userptr_t *argv, vaddr_t *stackptr) {
+	userptr_t argbase, userargv, arg;
+	vaddr_t stack;
+	size_t buflen;
+	int i, result;
+
+	KASSERT(lock_do_i_hold(ad->lock));
+
+	buflen = ad->bufend - ad->buffer;
+
+	/*begin the stack at the passed in top*/
+	stack = *stackptr;
+
+	/*copy the block of strings to the top of the user stack*/
+
+	/*figure out where the strings start*/
+	stack -= buflen;
+
+	/*align to sizeof(void *) boundary, this is the argbase*/
+	stack -= (stack & (sizeof(void *) - 1));
+	argbase = (userptr_t)stack;
+
+	/*now just copyout the whole block of arg strings*/
+	result = copyout(ad->buffer, argbase, buflen);
+	if (result) {
+		return result;
+	}
+
+	/*now copyout the argv itself. 
+	* the stack pointer is already suitably aligned.
+	*allow an extra slot for the NULL that terminates the vector
+	*/
+	stack -= (ad->nargs + 1)*sizeof(userptr_t);
+	userargv = (userptr_t)stack;
+
+	for (i = 0; i < ad->nargs; i++) {
+		arg = argbase + ad->offsets[i];
+		result = copyout(&arg, userargv, sizeof(userptr_t));
+		if (result) {
+			return result;
+		}
+		userargv += sizeof(userptr_t);
+	}
+
+	/*NULL terminates it*/
+	arg = NULL;
+	result = copyout(&arg, userargv, sizeof(userptr_t));
+	if (result) {
+		return result;
+	}
+	*argv = (userptr_t)stack;
+	*stackptr = stack;
+	return 0;
+}
+#endif /*ARGS*/
 int
 runprogram(char *progname)
 {
@@ -61,7 +131,32 @@ runprogram(char *progname)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+#if ARGS
+	int argc; /*number of arguments*/
+	userptr_t argv;
+#endif
 
+#if ARGS
+	/*pid check*/
+	KASSERT(curproc->p_pid >= PID_MIN && curproc->p_pid <= PID_MAX);
+
+	lock_acquire(argdata.lock);
+
+	/*make up argv strings*/
+	argdata.offsets = kmalloc(sizeof(size_t));
+	if (argdata.offsets == NULL) {
+		kfree(argdata.offsets);
+		lock_release(argdata.lock);
+		return ENOMEM;
+	}
+
+	/*copy it in, set the single offset*/
+	strcpy(argdata.buffer, progname);
+	argdata.bufend = argdata.buffer + (strlen(argdata.buffer)+1);
+	argdata.offsets[0] = 0;
+	argdata.nargs = 1;
+
+#endif /*ARGS*/
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 	if (result) {
@@ -99,9 +194,23 @@ runprogram(char *progname)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
+#if ARGS
+	result = copyout_args(&argdata, &argv, &stackptr);
+	if (result) {
+		kfree(argdata.buffer);
+		kfree(argdata.offsets);
+		lock_release(argdata.lock);
+	}
+	argc = argdata.nargs;
 
+	/*free the space*/
+	kfree(argdata.buffer);
+	kfree(argdata.offsets);
+	
+	lock_release(argdata.lock);
+#endif
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(argc /*argc*/, argv /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 
