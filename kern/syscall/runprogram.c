@@ -255,14 +255,6 @@ int sys_execv(char *program, char **args)
 	kfree(kprogram);
 	kfree_args((void **)uargs); //non funziona perchè sono indirizzi user e si blocca su KASSERT di kfree perchè non è multiplo di pagina
 	/* Warp to user mode. */
-	if (ustackptr % 8 == 0)
-	{
-		stackptr = ustackptr - 8;
-	}
-	else
-	{
-		stackptr = ustackptr - 4;
-	}
 	enter_new_process(argc /*argc*/, (userptr_t)ustackptr /*userspace addr of argv*/,
 					  NULL /*userspace addr of environment*/,
 					  stackptr, entrypoint);
@@ -274,6 +266,8 @@ int sys_execv(char *program, char **args)
 }
 #endif
 
+
+
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
@@ -281,7 +275,7 @@ int sys_execv(char *program, char **args)
  * Calls vfs_open on progname and thus may destroy it.
  */
 
-#define ARGS 1
+
  
 int
 runprogram(char *progname, unsigned long argc, char **args)
@@ -291,7 +285,7 @@ runprogram(char *progname, unsigned long argc, char **args)
 	vaddr_t entrypoint, stackptr;
 	int result;
 
-#if ARGS
+#if OPT_EXECV
 	int i;
 	size_t len;
 	size_t stack_offset = 0;
@@ -337,7 +331,7 @@ runprogram(char *progname, unsigned long argc, char **args)
 		return result;
 	}
 
-#if ARGS
+#if OPT_EXECV
 	if (args != NULL) {
 		/*program has arguments*/
 		argvptr = (char **)kmalloc(argc*sizeof(char **));
@@ -354,11 +348,6 @@ runprogram(char *progname, unsigned long argc, char **args)
 			if (argvptr[i] == NULL) {
 				return ENOMEM;
 			}
-
-			/*we must align by 4 since we deal with user stack*/
-			// while (len % 4 != 0) {
-			// 	len++;
-			// }
 			stackptr -= len;
 			if (stackptr & 0x3) {
 				stackptr -= stackptr & 0x3;
