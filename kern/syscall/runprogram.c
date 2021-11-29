@@ -184,10 +184,6 @@ int sys_execv(char *program, char **args)
 		return result;
 	}
 
-#if PRINT
-	kprintf("Proc %s pid = %d, address = %p, father = %p\n", curproc->p_name, curproc->p_pid, curproc, curproc->p_parent);
-#endif
-
 	/* Done with the file now. */
 	vfs_close(v);
 	/* Define the user stack in the address space */
@@ -201,8 +197,7 @@ int sys_execv(char *program, char **args)
 	/*devo tornare da kernel a user: qui devo usare il padding*/
 	/*strutture user dopo kernel*/
 	char **uargs;
-	vaddr_t ustackptr; /*user stack pointer*/
-	int length, tail;
+	int length;
 
 	uargs = (char **)kmalloc(sizeof(char *) * (argc + 1));
 	if (uargs == NULL)
@@ -213,20 +208,14 @@ int sys_execv(char *program, char **args)
 
 		return ENOMEM;
 	}
-	ustackptr = stackptr;
 	for (i = 0; i < (int)argc; i++)
 	{
 		length = strlen(kargs[i]) + 1;
 		uargs[i] = (char *)kmalloc(length * sizeof(char *));
-		ustackptr -= length;
-		tail = 0;
+		stackptr -= length;
 		/*padding*/
-		if (ustackptr & 0x3)
-		{
-			tail = ustackptr & 0x3;
-			ustackptr -= tail; /*sottraggo perchè sto scendendo nello stack*/
-		}
-		result = copyoutstr(kargs[i], (userptr_t)ustackptr, length, &waste); /*copio da kernel a user*/
+		if (stackptr & 0x3) stackptr -= stackptr & 0x3; //alignment by 4
+		result = copyoutstr(kargs[i], (userptr_t)stackptr, length, &waste); /*copio da kernel a user*/
 		if (result)
 		{
 			kfree_args((void **)kargs);
@@ -234,12 +223,12 @@ int sys_execv(char *program, char **args)
 			return -result;
 		}
 
-		uargs[i] = (char *)ustackptr; /*mi salvo l'indiritto dello stack user in uargs*/
+		uargs[i] = (char *)stackptr; /*mi salvo l'indiritto dello stack user in uargs*/
 	}
 
 	for (i = 0; i < (int)argc; i++)
 	{
-		result = copyout((const void *)uargs[argc - (i + 1)], (userptr_t)ustackptr, sizeof(char *));
+		result = copyout((const void *)uargs[argc - (i + 1)], (userptr_t)stackptr, sizeof(char *));
 		if (result)
 		{
 			kfree_args((void **)kargs);
@@ -255,7 +244,7 @@ int sys_execv(char *program, char **args)
 	kfree(kprogram);
 	kfree_args((void **)uargs); //non funziona perchè sono indirizzi user e si blocca su KASSERT di kfree perchè non è multiplo di pagina
 	/* Warp to user mode. */
-	enter_new_process(argc /*argc*/, (userptr_t)ustackptr /*userspace addr of argv*/,
+	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
 					  NULL /*userspace addr of environment*/,
 					  stackptr, entrypoint);
 
