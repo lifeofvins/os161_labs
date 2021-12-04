@@ -235,8 +235,6 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	}
 
 	*retval = newp->p_pid; /*parent returns with child's pid immediately*/
-	
-	/*not sure about inserting sys_waitpid inside fork*/
 	return 0;
 }
 #endif /*OPT_FORK*/

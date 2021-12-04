@@ -69,7 +69,7 @@ struct vnode;
 #if OPT_WAITPID
 /* G.Cabodi - 2019 - implement waitpid: 
    synch with semaphore (1) or cond.var.(0) */
-#define USE_SEMAPHORE_FOR_WAITPID 1
+#define USE_SEMAPHORE_FOR_WAITPID 0
 #endif
 
 
@@ -103,7 +103,7 @@ struct proc {
 
 #if OPT_FILE
 	/*cabodi*/
-	struct openfile *fileTable[OPEN_MAX];
+	struct openfile fileTable[OPEN_MAX];
 
 #endif
 
