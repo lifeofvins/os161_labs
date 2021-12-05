@@ -270,21 +270,46 @@ return the file descriptor of the openfile item
 	return -1;
 }
 int sys_close(int fd) {
-	
 	struct openfile *of = NULL;
 	struct vnode *vn;
 	
-	if (fd < 0 || fd > OPEN_MAX) return -1;
+	struct proc *cur = curproc;
+	KASSERT(cur != NULL);
+
+	/*Incorrect file descriptor*/
+	if(fd<0||fd>OPEN_MAX){
+		return EBADF;
+	}
+
 	of = curproc->fileTable[fd];
-	if (of == NULL) return -1;
+
+	if(of==NULL){
+		return EBADF;
+	}
+
 	curproc->fileTable[fd] = NULL;
 	
-	if(--of->ref_count > 0) return 0; /*just decrement ref_count*/
 	vn = of->vn;
 	of->vn = NULL;
-	if (vn == NULL) return -1;
+	if(vn==NULL)
+		return EINVAL; /* ? */
 	
-	vfs_close(vn);
+	/*if(--of->ref_count>0)
+		return 0;*/
+
+	lock_acquire(of->file_lock);
+	/*if it is the last close of this file, free it up*/
+	if(of->ref_count == 1){
+		vfs_close(vn);
+		lock_release(of->file_lock);
+		lock_destroy(of->file_lock);
+	}	
+	else{
+		KASSERT(of->ref_count > 1);	
+		of->ref_count--;
+		lock_release(of->file_lock);
+	}
+
 	return 0;
 }
 
