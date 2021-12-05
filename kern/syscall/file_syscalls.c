@@ -150,6 +150,7 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 	nwrite = size - ku.uio_resid;
 
 	lock_release(of->file_lock);
+
 	return nwrite;
 }
 
