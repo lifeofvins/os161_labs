@@ -90,22 +90,43 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size) {
 	struct vnode *vn;
 	struct openfile *of;
 	void *kbuf;
+
+	struct proc *cur = curproc;
+	KASSERT(cur != NULL);
 	
-	if (fd < 0 || fd > OPEN_MAX) return -1;
+	if (fd < 0 || fd > OPEN_MAX) return EBADF;
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
+	if(of==NULL){
+		return EBADF;
+	}
 	vn = of->vn;
-	KASSERT(vn != NULL);
+	if(vn==NULL)
+		return EINVAL;
 	
+	lock_acquire(of->file_lock);
+	if(of->accmode == O_RDONLY){
+		lock_release(of->file_lock);
+		return EBADF;
+	}
 	kbuf = kmalloc(size);
 	/*siccome devo fare la write metto prima i dati nel buffer e poi scrivo*/
 	copyin(buf_ptr, kbuf, size);
 	uio_kinit(&iov, &ku, kbuf, size, of->offset, UIO_WRITE);
+	if(ku.uio_segflg != UIO_USERSPACE){
+		lock_release(of->file_lock);
+		return EINVAL; /* ? */	
+	}
 	result = VOP_WRITE(vn, &ku);
-	if(result) return result;
+	if(result) {
+		lock_release(of->file_lock);
+		return result;
+	}
 	kfree(kbuf);
 	of->offset = ku.uio_offset;
 	nwrite = size - ku.uio_resid;
+
+	lock_release(of->file_lock);
 	return nwrite;
 }
 
@@ -196,7 +217,8 @@ return the file descriptor of the openfile item
 	int accmode; /*access mode*/
 	int result; /*result of filetable functions*/
 
-
+	struct proc *cur = curproc;
+	KASSERT(cur != NULL);
 		/*path pointer check*/
 	if(path == NULL){
 		*errp = EINVAL;
@@ -324,25 +346,39 @@ int sys_close(int fd) {
 int
 sys_write(int fd, userptr_t buf_ptr, size_t size)
 {
-  int i;
-  char *p = (char *)buf_ptr;
+	int i;
+	char *p = (char *)buf_ptr;
 
-  if (fd!=STDOUT_FILENO && fd!=STDERR_FILENO) {
-#if OPT_FILE
-    return file_write(fd, buf_ptr, size);
+	struct proc *cur = curproc;
+	KASSERT(cur != NULL);
+
+	if(fd == STDERR_FILENO)
+	{
+		return -1;
+	}
+
+	if(fd != STDOUT_FILENO){
+#if 	OPT_FILE
+	return file_write(fd, buf_ptr, size);
 #else
-    kprintf("sys_write supported only to stdout\n");
-    return -1;
+	return -1;
 #endif
-  }
+	}
 
-  for (i=0; i<(int)size; i++) {
-    putch(p[i]);
-  }
+	if(fd == STDOUT_FILENO)
+	{
+		for(i = 0;i < (int)size;i++)
+		{
+			putch(p[i]);
+		}
+	}
+	else
+	{
+		return -1;
+	}
 
-  return (int)size;
+return 1;	
 }
-
 int
 sys_read(int fd, userptr_t buf_ptr, size_t size)
 {
