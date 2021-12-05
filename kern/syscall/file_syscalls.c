@@ -351,30 +351,24 @@ sys_write(int fd, userptr_t buf_ptr, size_t size)
 
 	struct proc *cur = curproc;
 	KASSERT(cur != NULL);
-
-	if(fd == STDERR_FILENO)
-	{
+	
+	if (fd == STDIN_FILENO) {
+		/*we cannot write on stdin*/
 		return -1;
 	}
-
-	if(fd != STDOUT_FILENO){
-#if 	OPT_FILE
-	return file_write(fd, buf_ptr, size);
-#else
-	return -1;
-#endif
-	}
-
-	if(fd == STDOUT_FILENO)
+	if(fd == STDOUT_FILENO || fd == STDERR_FILENO)
 	{
 		for(i = 0;i < (int)size;i++)
 		{
 			putch(p[i]);
 		}
 	}
-	else
-	{
-		return -1;
+	else {
+#if 	OPT_FILE
+	return file_write(fd, buf_ptr, size);
+#else
+	return -1;
+#endif
 	}
 
 return 1;	
