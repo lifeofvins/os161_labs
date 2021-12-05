@@ -103,7 +103,7 @@ struct proc {
 
 #if OPT_FILE
 	/*cabodi*/
-	struct openfile fileTable[OPEN_MAX];
+	struct openfile *fileTable[OPEN_MAX];
 
 #endif
 

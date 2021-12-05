@@ -4,10 +4,10 @@
  * just works (partially) on stdin/stdout
  */
 
+
 #include <types.h>
 #include <kern/unistd.h>
 #include <kern/errno.h>
-#include <kern/limits.h>
 #include <clock.h>
 #include <syscall.h>
 #include <current.h>
@@ -20,162 +20,114 @@
 #include <vnode.h>
 #include <vfs.h>
 #include <limits.h>
-#include <kern/fcntl.h>
 #include <uio.h>
 #include <proc.h>
-#include <synch.h>
 #include <kern/seek.h>
 #include <kern/stat.h>
+#include <synch.h>
+#include <kern/fcntl.h>
 
 /*max num of system wide open file*/
-#define SYSTEM_OPEN_MAX 10 * OPEN_MAX
+#define SYSTEM_OPEN_MAX 10*OPEN_MAX
+
 
 #define USE_KERNEL_BUFFER 1 //cabodi
 
-struct openfile
-{
-	struct vnode *vn;		/*pointer to vnode*/
-	mode_t mode;			/*read-only, write-only, read-write*/
-	off_t offset;			/*ad ogni openfile corrisponderà un offset, cioè dove stanno leggendo e scrivendo dentro al file: l'offset avanza man mano che si legge o scrive nel file*/
-	int accmode;			/*access mode*/
-	unsigned int ref_count; /*una openfile potrebbe essere condivisa*/
+
+struct openfile {
+	struct vnode *vn; /*pointer to vnode*/
+	mode_t mode; /*read-only, write-only, read-write*/
+	off_t offset; /*ad ogni openfile corrisponderà un offset, cioè dove stanno leggendo e scrivendo dentro al file: l'offset avanza man mano che si legge o scrive nel file*/
+	int accmode; 
 	struct lock *file_lock;
-};
+	unsigned int ref_count; /*una openfile potrebbe essere condivisa*/
+}; 
 
 struct openfile systemFileTable[SYSTEM_OPEN_MAX];
 
-void openfileIncrRefCount(struct openfile *of)
-{
-	if (of != NULL)
+void openfileIncrRefCount(struct openfile *of) {
+	if (of != NULL) 
 		of->ref_count++;
 }
 
 #if USE_KERNEL_BUFFER
 /*per effettuare una read si deve predisporre opportunamente un puntatore a struct uio ku
 (che descrive il tipo di i/o da effettuare) e il puntatore al FCB*/
-static int file_read(int fd, userptr_t buf_ptr, size_t size)
-{
+static int file_read(int fd, userptr_t buf_ptr, size_t size) {
 	struct iovec iov;
 	struct uio ku;
 	int result, nread;
 	struct vnode *vn;
 	struct openfile *of;
 	void *kbuf; /*kernel buffer*/
-
-	if (fd < 0 || fd > OPEN_MAX)
-		return EBADF;
+	
+	if (fd < 0 || fd > OPEN_MAX) return EBADF;
 	of = curproc->fileTable[fd];
-	if (of == NULL)
-		return EBADF;
+	if (of == NULL) return EBADF;
 	vn = of->vn;
-	if (vn == NULL)
-		return EINVAL;
-
-	lock_acquire(of->file_lock);
-	if (of->accmode == O_WRONLY)
-	{
-		/*file read --> voglio leggere il file*/
-		lock_release(of->file_lock);
-		return EBADF;
-	}
+	if (vn == NULL) return EINVAL;
+	
 	/*allocation of kernel buffer*/
 	kbuf = kmalloc(size);
+	/*predispongo la struttura dati per effettuare la lettura e 
+	successivamente faccio la lettura usando come parametri
+	soltanto il vnode e il puntatore a ku*/
 	uio_kinit(&iov, &ku, kbuf, size, of->offset, UIO_READ); /*sets up a uio data structure*/
-
-	if (ku.uio_segflg != UIO_USERSPACE)
-	{
-		lock_release(of->file_lock);
-		return EINVAL;
-	}
-
 	result = VOP_READ(vn, &ku);
-	if (result)
-	{
-		lock_release(of->file_lock);
-		return result;
-	}
+	if(result) return result;
 	/*i dati vanno a finire in memoria kernel*/
 	of->offset = ku.uio_offset;
 	nread = size - ku.uio_resid;
 	copyout(kbuf, buf_ptr, nread); /*copio nel buffer user nread bytes memorizzati in ku (memoria kernel)*/
 	kfree(kbuf);
-
-	lock_release(of->file_lock);
-	kprintf("Bytes read = %d\n", nread);
-
 	return nread;
 }
 
-static int file_write(int fd, userptr_t buf_ptr, size_t size)
-{
+static int file_write(int fd, userptr_t buf_ptr, size_t size) {
 	struct iovec iov;
 	struct uio ku;
 	int result, nwrite;
 	struct vnode *vn;
 	struct openfile *of;
 	void *kbuf;
-
-	if (fd < 0 || fd > OPEN_MAX)
-		return EBADF;
+	
+	if (fd < 0 || fd > OPEN_MAX) return -1;
 	of = curproc->fileTable[fd];
-	if (of == NULL)
-		return EBADF;
+	KASSERT(of != NULL);
 	vn = of->vn;
-	if (vn == NULL)
-		return EINVAL;
-
-	lock_acquire(of->file_lock);
-	if (of->accmode == O_RDONLY)
-	{
-		lock_release(of->file_lock);
-		return EBADF;
-	}
+	KASSERT(vn != NULL);
+	
 	kbuf = kmalloc(size);
 	/*siccome devo fare la write metto prima i dati nel buffer e poi scrivo*/
 	copyin(buf_ptr, kbuf, size);
 	uio_kinit(&iov, &ku, kbuf, size, of->offset, UIO_WRITE);
-
-	if (ku.uio_segflg != UIO_USERSPACE)
-	{
-		lock_release(of->file_lock);
-		return EINVAL;
-	}
-
 	result = VOP_WRITE(vn, &ku);
-	if (result)
-	{
-		lock_release(of->file_lock);
-		return result;
-	}
+	if(result) return result;
 	kfree(kbuf);
 	of->offset = ku.uio_offset;
 	nwrite = size - ku.uio_resid;
-
-	lock_release(of->file_lock);
-	kprintf("Bytes written = %d\n", nwrite);
 	return nwrite;
 }
 
 #else /*no kernel buffer*/
-static int file_read(int fd, userptr_t buf_ptr, size_t size)
-{
+static int file_read(int fd, userptr_t buf_ptr, size_t size) {
 	struct iovec iov;
 	struct uio u; /*user*/
 	struct vnode *vn;
 	struct openfile *of;
 	int result;
-
-	if (fd < 0 || fd > OPEN_MAX)
-		return -1;
+	
+	if (fd < 0 || fd > OPEN_MAX) return -1;
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
 	vn = of->vn;
 	KASSERT(vn != NULL);
-
+  
+  
 	/*agisco sulla struct io user*/
 	iov.iov_ubase = buf_ptr;
 	iov.iov_len = size;
-
+	
 	u.uio_iov = &iov; /*struct con l'indirizzo logico e la dimensione*/
 	u.uio_iovcnt = 1;
 	u.uio_resid = size;
@@ -183,57 +135,53 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_READ;
 	u.uio_space = curproc->p_addrspace; /*punta all'address space del processo corrente*/
-
+	
 	result = VOP_READ(vn, &u);
-	if (result)
-		return result;
-
+	if(result) return result;
+	
 	of->offset = u.uio_offset;
 	return (size - u.uio_resid);
 }
 
-static int file_write(int fd, userptr_t buf_ptr, size_t size)
-{
+static int file_write(int fd, userptr_t buf_ptr, size_t size) {
 	struct iovec iov;
 	struct uio u;
 	int result;
 	struct vnode *vn;
 	struct openfile *of;
-
-	if (fd < 0 || fd > OPEN_MAX)
-		return -1;
+	
+	if (fd < 0 || fd > OPEN_MAX) return -1;
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
 	vn = of->vn;
 	KASSERT(vn != NULL);
-
-	iov.iov_ubase = buf_ptr;
-	iov.iov_len = size;
-
+	
+  	iov.iov_ubase = buf_ptr;
+  	iov.iov_len = size;
+  
 	u.uio_iov = &iov;
 	u.uio_iovcnt = 1;
-	u.uio_resid = size;
+	u.uio_resid = size; 
 	u.uio_offset = of->offset;
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_WRITE;
 	u.uio_space = curproc->p_addrspace;
-
+	
 	result = VOP_WRITE(vn, &u);
-	if (result)
-		return result;
-
+	if(result) return result;
+	
 	of->offset = u.uio_offset;
-
+	
 	return (size - u.uio_resid);
 }
 
 #endif /*use kernel buffer*/
+	
 
 /*file system calls for open/close*/
 
-int sys_open(userptr_t path, int openflags, mode_t mode, int *errp)
-{
-	/*1) opens a file: create an openfile item
+int sys_open(userptr_t path, int openflags, mode_t mode, int *errp) {
+/*1) opens a file: create an openfile item
 *2) obtain vnode from vfs_open()
 *3) initialize offset in openfile
 return the file descriptor of the openfile item
@@ -243,88 +191,73 @@ return the file descriptor of the openfile item
 	int i;
 	struct vnode *v;
 	struct openfile *of = NULL; /*create an openfile item*/
-	int result;					/*result of filetable functions*/
-
 	struct stat st;
-	int accmode;
-	char fname[PATH_MAX];
+	char fname[PATH_MAX]; /*filename in kernel*/
+	int accmode; /*access mode*/
+	int result; /*result of filetable functions*/
 
-	/*path pointer check*/
-	/*path pointer check*/
-	if (path == NULL)
-	{
+
+		/*path pointer check*/
+	if(path == NULL){
 		*errp = EINVAL;
 		return -1;
 	}
-
+	
 	/*flag check*/
 	accmode = openflags & O_ACCMODE;
-	if (accmode != O_RDONLY && accmode != O_WRONLY && accmode != O_RDWR)
-	{
+	if(accmode != O_RDONLY && accmode != O_WRONLY && accmode != O_RDWR){
 		*errp = EINVAL;
 		return -1;
 	}
 
 	/*copy a string from user space to kernel space*/
 	result = copyinstr(path, fname, sizeof(fname), NULL);
-
-	if (result)
-	{
-		return result;
+	
+	if(result){
+		return  result;
 	}
+
 	result = vfs_open((char *)path, openflags, mode, &v); /*obtain vnode from vfs_open()*/
-	if (result)
-	{
-		*errp = ENOENT;
-		return -1;
+	if(result) {
+	  *errp = ENOENT;
+	  return -1;
 	}
-
+	
 	/*search in system open file table*/
-	for (i = 0; i < SYSTEM_OPEN_MAX; i++)
-	{
+	for(i = 0; i < SYSTEM_OPEN_MAX; i++) {
 		/*search for free pos in which place the openfile struct*/
-		if (systemFileTable[i].vn == NULL)
-		{
+		if (systemFileTable[i].vn == NULL) {
 			of = &systemFileTable[i];
 			of->vn = v;
 			of->offset = 0; /*initialize offset. TODO: handle offset with append*/
 			of->accmode = accmode;
-			of->ref_count = 1;
 			of->file_lock = lock_create(fname);
+			of->ref_count = 1;
 			break;
 		}
 	}
-	if (of->file_lock == NULL)
-	{
+	if(of->file_lock == NULL){
 		vfs_close(v);
-		*errp = ENOMEM;
+		*errp = ENOMEM;	
 		return -1;
 	}
-
-	if (of == NULL)
-	{
+	if (of == NULL) {
 		/*non ho trovato posto nella system open file table*/
 		*errp = ENFILE;
 		lock_destroy(of->file_lock);
 	}
-	else
-	{
-
-		if (openflags & O_APPEND)
-		{
+	else {
+		if(openflags & O_APPEND){
 			result = VOP_STAT(of->vn, &st);
-			if (result)
-			{
+			if(result){
 				vfs_close(v);
 				*errp = EINVAL;
 				return -1;
 			}
 			of->offset = st.st_size;
 		}
-		for (fd = STDERR_FILENO + 1; fd < OPEN_MAX; fd++)
-		{
-			if (curproc->fileTable[fd] == NULL)
-			{
+		for (fd = STDERR_FILENO+1; fd < OPEN_MAX; fd++) {
+			if (curproc->fileTable[fd] == NULL) {
 				curproc->fileTable[fd] = of;
 				return fd;
 			}
@@ -332,105 +265,81 @@ return the file descriptor of the openfile item
 		/*no free slot in process open file table*/
 		*errp = EMFILE;
 	}
-
 	/*if I'm here, something went wrong*/
 	vfs_close(v);
 	return -1;
 }
-int sys_close(int fd)
-{
-
+int sys_close(int fd) {
+	
 	struct openfile *of = NULL;
 	struct vnode *vn;
-
-	if (fd < 0 || fd > OPEN_MAX)
-		return EBADF;
+	
+	if (fd < 0 || fd > OPEN_MAX) return -1;
 	of = curproc->fileTable[fd];
-	if (of == NULL)
-		return -1;
+	if (of == NULL) return -1;
 	curproc->fileTable[fd] = NULL;
-
+	
+	if(--of->ref_count > 0) return 0; /*just decrement ref_count*/
 	vn = of->vn;
 	of->vn = NULL;
-	if (vn == NULL)
-		return EINVAL;
-	if (--of->ref_count > 0)
-		return 0; /*just decrement ref_count*/
-
-	lock_acquire(curproc->fileTable[fd]->file_lock);
-	/*if it is the last close of this file, free it up*/
-	if (of->ref_count == 1)
-	{
-		vfs_close(vn);
-		lock_release(of->file_lock);
-		lock_destroy(of->file_lock);
-	}
-	else
-	{
-		KASSERT(of->ref_count > 1);
-		of->ref_count--;
-		lock_release(of->file_lock);
-	}
-
-	//vfs_close(vn);
+	if (vn == NULL) return -1;
+	
+	vfs_close(vn);
 	return 0;
 }
 
 #endif /*OPT_FILE riga 15*/
 
+
+
+
 /*
  * simple file system calls for write/read
  */
-int sys_write(int fd, userptr_t buf_ptr, size_t size)
+int
+sys_write(int fd, userptr_t buf_ptr, size_t size)
 {
-	int i;
-	char *p = (char *)buf_ptr;
+  int i;
+  char *p = (char *)buf_ptr;
 
-	if (fd != STDOUT_FILENO /*&& fd != STDERR_FILENO*/)
-	{
+  if (fd!=STDOUT_FILENO && fd!=STDERR_FILENO) {
 #if OPT_FILE
-		return file_write(fd, buf_ptr, size);
+    return file_write(fd, buf_ptr, size);
 #else
-		kprintf("sys_write supported only to stdout\n");
-		return -1;
+    kprintf("sys_write supported only to stdout\n");
+    return -1;
 #endif
-	}
-	if (fd == STDOUT_FILENO) {
-		for (i = 0; i < (int)size; i++)
-		{
-			putch(p[i]);
-		}
-	}
-	else {
-		return -1;
-	}
+  }
 
-	return (int)size;
+  for (i=0; i<(int)size; i++) {
+    putch(p[i]);
+  }
+
+  return (int)size;
 }
 
-int sys_read(int fd, userptr_t buf_ptr, size_t size)
+int
+sys_read(int fd, userptr_t buf_ptr, size_t size)
 {
-	char *p = (char *)buf_ptr;
-	int i;
+        char *p = (char *)buf_ptr;
+        int i;
 
-	if (fd != STDIN_FILENO)
-	{
+  if (fd!=STDIN_FILENO) {
 #if OPT_FILE
-		return file_read(fd, buf_ptr, size);
+    return file_read(fd, buf_ptr, size);
 #else
-		kprintf("sys_read supported only to stdin\n");
-		return -1;
+    kprintf("sys_read supported only to stdin\n");
+    return -1;
 #endif
-	}
+  }
 
-	for (i = 0; i < (int)size; i++)
-	{
-		p[i] = getch();
-		if (p[i] < 0)
-			return i;
-	}
+  for (i=0; i<(int)size; i++) {
+    p[i] = getch();
+    if (p[i] < 0) 
+      return i;
+  }
 
-	return (int)size;
+  return (int)size;
 }
 /**
  * Implementation of the dup2 system call.
@@ -456,25 +365,26 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size)
  * error code if there's been an error. 
  */
 
-int sys_dup2(int old_fd, int new_fd, int *ret_val)
+int
+sys_dup2(int old_fd, int new_fd, int *ret_val)
 {
-	struct openfile of;
-	/**
+    struct openfile of;
+    /**
      * Error handling:
      * File descriptors cannot be negative integer numbers
      * or integer greater than the value specified in OPEN_MAX constant.
      * Moreover, there's a function which checks whether the
      * old_fd is a actually existing inside the process filetable or not.
      */
-	if (!is_valid_fd(old_fd) || !is_valid_fd(new_fd))
-	{
-		*ret_val = -1;
-		return EBADF;
-	}
+    if (!is_valid_fd(old_fd) || !is_valid_fd(new_fd))
+    {
+        *ret_val = -1;
+        return EBADF;
+    }
 
 	//TODO return EMFILE if the process file table was full, or a process-specific limit on open files was reached
 
-	/**
+    /**
      * Old file descriptor equal to the new one.
      * There's no operation to be done, but
      * ret_val's content is set to 0xFF so that
@@ -483,36 +393,36 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
      * Actually useless.
      * Probably it will be removed.
      */
-	if (old_fd == new_fd)
-	{
-		*ret_val = 0xFF;
+    if (old_fd == new_fd)
+    {
+        *ret_val = 0xFF;
 		//*ret_val = new_fd;
 
 		/*from linux man page: if oldf == newf then dup2 returns newf*/
-		return 0;
-	}
+        return 0;
+    }
 
-	/* Check whether new_fd is previously opened and eventually close it */
-	if (systemFileTable[new_fd].vn != NULL)
-	{
-		sys_close(new_fd);
-	}
+    /* Check whether new_fd is previously opened and eventually close it */
+    if (systemFileTable[new_fd].vn != NULL)
+    {
+        sys_close(new_fd);
+    }
 
-	// /* Open the new_fd descriptor */
-	// if (sys_open(new_fd) == -1)
-	// {
-	//     *ret_val = -1;
-	//     return EBADF;
-	// }
+    // /* Open the new_fd descriptor */
+    // if (sys_open(new_fd) == -1)
+    // {
+    //     *ret_val = -1;
+    //     return EBADF;
+    // }
 
-	/* Let the entry related to new_fd point to the old_fd's one */
-	of = systemFileTable[old_fd];
-	systemFileTable[new_fd].vn = of.vn;
-	systemFileTable[new_fd].mode = of.mode;
-	systemFileTable[new_fd].offset = of.offset;
-	systemFileTable[new_fd].ref_count = of.ref_count;
+    /* Let the entry related to new_fd point to the old_fd's one */
+    of = systemFileTable[old_fd];
+    systemFileTable[new_fd].vn = of.vn;
+    systemFileTable[new_fd].mode = of.mode;
+    systemFileTable[new_fd].offset = of.offset;
+    systemFileTable[new_fd].ref_count = of.ref_count;
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -528,62 +438,63 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
  * - 0, on success
  * - error code, otherwise
  */
-int sys_lseek(int fd, off_t offset, int whence, int *ret_val)
+int
+sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 {
 
 	//TODO handle 64-bit parameter and 64-bit return value
-	off_t actual_offset = 0;
-	off_t dis;
-	struct openfile *of;
-	struct stat stat;
+    off_t actual_offset = 0;
+    off_t dis;
+    struct openfile *of;
+    struct stat stat;
 
-	spinlock_acquire(&curproc->p_spinlock);
-	/* Checks whether the file descriptor is valid */
-	if (!is_valid_fd(fd))
-	{
-		*ret_val = -1;
-		spinlock_release(&curproc->p_spinlock);
-		return EBADF;
-	}
+    spinlock_acquire(&curproc->p_spinlock);
+    /* Checks whether the file descriptor is valid */
+    if (!is_valid_fd(fd))
+    {
+        *ret_val = -1;
+        spinlock_release(&curproc->p_spinlock);
+        return EBADF;
+    }
 
-	/* Checks whether the whence parameter is valid */
-	if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
-	{
-		*ret_val = -1;
-		spinlock_release(&curproc->p_spinlock);
-		return EINVAL;
-	}
+    /* Checks whether the whence parameter is valid */
+    if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
+    {
+        *ret_val = -1;
+        spinlock_release(&curproc->p_spinlock);
+        return EINVAL;
+    }
 
-	/* If the offset is zero, we can exit */
-	if (offset == 0)
-	{
-		*ret_val = 0;
-		spinlock_release(&curproc->p_spinlock);
-		return 0;
-	}
+    /* If the offset is zero, we can exit */
+    if(offset == 0)
+    {
+        *ret_val = 0;
+        spinlock_release(&curproc->p_spinlock);
+        return 0;
+    }
 
-	of = &systemFileTable[fd];
-
-	/**
+    of = &systemFileTable[fd];
+    
+    /**
      * SEEK_SET
      * The offset will simply be the one
      * passed as parameter.
      */
-	if (whence == SEEK_SET)
-	{
-		actual_offset = offset;
-	}
-	/**
+    if(whence == SEEK_SET)
+    {
+        actual_offset = offset;
+    }
+    /**
      * SEEK_CUR
      * We need to compute the displacement
      * from the current position adding the
      * offset passed as parameter.
      */
-	else if (whence == SEEK_CUR)
-	{
-		actual_offset = of->offset + offset;
-	}
-	/**
+    else if(whence == SEEK_CUR)
+    {
+        actual_offset = of->offset + offset;
+    }
+    /**
      * SEEK_END
      * In this case, we need to retrieve the
      * information about the length of the
@@ -596,17 +507,17 @@ int sys_lseek(int fd, off_t offset, int whence, int *ret_val)
      * <------------------->
      * <--------file_length+offset------------>
      */
-	else if (whence == SEEK_END)
-	{
-		VOP_STAT(of->vn, &stat);
-		dis = stat.st_size;
-		actual_offset = dis + offset;
-	}
+    else if(whence == SEEK_END)
+    {
+        VOP_STAT(of->vn, &stat);
+        dis = stat.st_size;
+        actual_offset = dis + offset;
+    }
 
-	of->offset = actual_offset;
-
-	spinlock_release(&curproc->p_spinlock);
-	return 0;
+    of->offset = actual_offset;
+    
+    spinlock_release(&curproc->p_spinlock);
+    return 0;
 }
 
 /**
@@ -619,9 +530,10 @@ int sys_lseek(int fd, off_t offset, int whence, int *ret_val)
  * - 0, if fd is not valid
  * - whatever else otherwise
  */
-int is_valid_fd(int fd)
+int
+is_valid_fd(int fd)
 {
-	if (fd < 0 || fd > OPEN_MAX)
-		return 0;
-	return !(curproc->fileTable[fd]->vn == NULL);
+    if (fd < 0 || fd > OPEN_MAX)
+        return 0;
+    return !(curproc->fileTable[fd]->vn == NULL);
 }
