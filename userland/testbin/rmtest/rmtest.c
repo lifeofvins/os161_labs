@@ -123,7 +123,6 @@ main(void)
 
 	/* rewind the file */
 	if (lseek(file, 0, SEEK_SET)) {
-		printf("Error lseek\n");
 		err(1, "lseek");
 	}
 

@@ -152,10 +152,6 @@ thread_create(const char *name)
 
 	/* If you add to struct thread, be sure to initialize here */
 	
-#if OPT_EXECV
-	thread->t_addrspace = NULL;
-	spinlock_init(&thread->t_spinlock);
-#endif
 
 	return thread;
 }
@@ -289,26 +285,7 @@ thread_destroy(struct thread *thread)
 	if (thread->t_stack != NULL) {
 		kfree(thread->t_stack);
 	}
-	
-	
-#if OPT_EXECV
-	/*VM fields*/
-	if (thread->t_addrspace) {
-		struct addrspace *as;
-		if (thread == curthread) {
-			as = thread_setas(NULL);
-			as_deactivate();
-		}
-		else {
-			as = thread->t_addrspace;
-			thread->t_addrspace = NULL;
-		}
-		as_destroy(as);
-	}
-	
-	/*spinlock*/
-	spinlock_cleanup(&thread->t_spinlock);
-#endif
+
 	threadlistnode_cleanup(&thread->t_listnode);
 	thread_machdep_cleanup(&thread->t_machdep);
 
@@ -325,38 +302,7 @@ thread_destroy(struct thread *thread)
  *
  * The list of zombies is per-cpu.
  */
- 
- 
-/*progetto PDS: funzioni per gestire l'address space del thread*/
-#if OPT_EXECV
-struct addrspace *
-thread_setas(struct addrspace *newas) {
-	struct addrspace *oldas;
-	struct thread *thread = curthread;
-	
-	KASSERT(thread != NULL);
-	
-	spinlock_acquire(&thread->t_spinlock);
-	oldas = thread->t_addrspace;
-	thread->t_addrspace = newas;
-	spinlock_release(&thread->t_spinlock);
-	return oldas;
-}
-struct addrspace *
-thread_getas(void) {
-	struct addrspace *as;
-	struct thread *thread = curthread;
 
-	if (thread == NULL) {
-		return NULL;
-	}
-
-	spinlock_acquire(&thread->t_spinlock);
-	as = thread->t_addrspace;
-	spinlock_release(&thread->t_spinlock);
-	return as;
-}
-#endif /*OPT_EXECV*/
 
 static
 void

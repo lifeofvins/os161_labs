@@ -543,7 +543,7 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
  * - 0, on success
  * - error code, otherwise
  */
-int
+off_t
 sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 {
     off_t actual_offset = 0;
@@ -620,7 +620,7 @@ sys_lseek(int fd, off_t offset, int whence, int *ret_val)
     of->offset = actual_offset;
     
     spinlock_release(&curproc->p_spinlock);
-    return 0;
+    return actual_offset;
 }
 
 /**

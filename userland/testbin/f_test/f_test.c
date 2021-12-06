@@ -50,7 +50,6 @@
 
 #define SECTOR_SIZE  512
 
-
 #define BUFFER_SIZE  (2 * SECTOR_SIZE + 1)
 #define BIGFILE_SIZE (270 * BUFFER_SIZE)
 #define BIGFILE_NAME "large-f"
@@ -308,7 +307,6 @@ int
 main(int argc, char * argv[])
 {
 	int tv = 0;
-
 	if (argc > 1) {
 		if (*argv[1]=='1') {
 			tv = RUNBIGFILE;

@@ -41,7 +41,6 @@
 #include <synch.h>
 
 
-#define SEM 0
 ////////////////////////////////////////////////////////////
 //
 // Semaphore.
@@ -219,7 +218,7 @@ lock_acquire(struct lock *lock)
 	/*LAB3: implemento lock acquire utilizzando P(sem)*/
 	P(lock->lock_sem); //versione con semaforo
 	/*siccome alla fine della P rilascio lo spinlock, lo riacquisisco subito dopo*/
-	spinlock_acquire(lock->lock_spinlock);
+	spinlock_acquire(&lock->lock_spinlock);
 #else
 	/*siccome per usare la wchan devo possedere lo spinlock, devo prima acquisirlo*/
 	spinlock_acquire(&lock->lock_spinlock);

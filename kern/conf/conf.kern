@@ -467,6 +467,7 @@ optfile fork syscall/proc_syscalls.c
 #DEFINISCO OPZIONI PER LAB5 (FILE)
 defoption file
 optfile file syscall/file_syscalls.c
+optfile file syscall/curdir_syscalls.c
 
 #PROGETTO (fork già definita prima)
 defoption execv

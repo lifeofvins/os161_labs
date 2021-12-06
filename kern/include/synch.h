@@ -48,7 +48,7 @@
 /*LAB3*/
 
 
-#define LOCK_SEM 0
+#define SEM 0
 /*
  * Dijkstra-style semaphore.
  *
@@ -96,7 +96,7 @@ struct lock {
 #if OPT_SYNCH
         
         /*implemento il lock come un semaforo binario che rinforza la mutua esclusione --> solo chi ha acquisito il lock può rilasciarlo*/
-#if LOCK_SEM
+#if SEM
 	struct semaphore *lock_sem;
 #else
 	/*implemento il lock con spinlock e wait channel*/

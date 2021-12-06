@@ -113,10 +113,6 @@ struct thread {
 	 */
 
 	/* add more here as needed */
-#if OPT_EXECV
-	struct addrspace *t_addrspace; /*virtual address space*/
-	struct spinlock t_spinlock;
-#endif
 };
 
 /*
@@ -179,10 +175,4 @@ void schedule(void);
  */
 void thread_consider_migration(void);
 
-
-
-#if OPT_EXECV
-struct addrspace *thread_setas(struct addrspace *newas);
-struct addrspace *thread_getas(void);
-#endif
 #endif /* _THREAD_H_ */

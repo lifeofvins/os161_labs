@@ -69,10 +69,13 @@ struct openfile;
 void openfileIncrRefCount(struct openfile *of);
 int sys_open(userptr_t path, int openflags, mode_t mode, int *errp);
 int sys_close(int fd);
+int sys_dup2(int old_fd, int new_fd, int *ret_val);
 
 /*sdp project*/
+int sys_getcwd(userptr_t buf, size_t size, int *ret_val);
+int sys_chdir(userptr_t path);
 int sys_dup2(int old_fd, int new_fd, int *ret_val);
-int sys_lseek(int fd, off_t offset, int whence, int *ret_val);
+off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val);
 int is_valid_fd(int fd);
 #endif
 int sys_write(int fd, userptr_t buf_ptr, size_t size);
