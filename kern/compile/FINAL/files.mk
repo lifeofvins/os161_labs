@@ -93,6 +93,7 @@ SRCS.PLATFORM.sys161+=$(KTOP)/arch/sys161/dev/lamebus_machdep.c
 SRCS.PLATFORM.sys161+=$(KTOP)/arch/sys161/main/start.S
 SRCS+=$(KTOP)/syscall/curdir_syscalls.c
 SRCS+=$(KTOP)/syscall/file_syscalls.c
+SRCS+=$(KTOP)/syscall/fork.c
 SRCS+=$(KTOP)/syscall/loadelf.c
 SRCS+=$(KTOP)/syscall/proc_syscalls.c
 SRCS+=$(KTOP)/syscall/runprogram.c
