@@ -10,4 +10,5 @@ syscall.o: ../../arch/mips/syscall/syscall.c ../../include/types.h \
  includelinks/machine/vm.h opt-dumbvm.h includelinks/machine/thread.h \
  ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
  ../../include/syscall.h opt-syscalls.h opt-fork.h opt-file.h \
- ../../include/copyinout.h ../../include/synch.h opt-synch.h
+ opt-waitpid.h ../../include/copyinout.h ../../include/synch.h \
+ opt-synch.h

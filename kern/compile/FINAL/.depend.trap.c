@@ -12,4 +12,4 @@ trap.o: ../../arch/mips/locore/trap.c ../../include/types.h \
  ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
  ../../include/current.h includelinks/machine/current.h \
  ../../include/mainbus.h ../../include/syscall.h opt-syscalls.h \
- opt-fork.h opt-file.h
+ opt-fork.h opt-file.h opt-waitpid.h
