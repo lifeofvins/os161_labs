@@ -29,7 +29,7 @@
 /*max num of system wide open file*/
 #define SYSTEM_OPEN_MAX 10 * OPEN_MAX
 
-#define USE_KERNEL_BUFFER 1 //cabodi
+#define USE_KERNEL_BUFFER 0 //cabodi
 
 struct openfile
 {
@@ -168,6 +168,7 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 	if (fd < 0 || fd > OPEN_MAX)
 		return -1;
 	of = curproc->fileTable[fd];
+	lock_acquire(of->file_lock);
 	KASSERT(of != NULL);
 	vn = of->vn;
 	KASSERT(vn != NULL);
@@ -189,6 +190,7 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 		return result;
 
 	of->offset = u.uio_offset;
+	lock_release(of->file_lock);
 	return (size - u.uio_resid);
 }
 
@@ -207,6 +209,7 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 	vn = of->vn;
 	KASSERT(vn != NULL);
 
+	lock_acquire(of->file_lock);
 	iov.iov_ubase = buf_ptr;
 	iov.iov_len = size;
 
@@ -223,7 +226,7 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 		return result;
 
 	of->offset = u.uio_offset;
-
+	lock_release(of->file_lock);
 	return (size - u.uio_resid);
 }
 
