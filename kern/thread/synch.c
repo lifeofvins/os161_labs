@@ -241,9 +241,8 @@ lock_release(struct lock *lock)
 #if OPT_SYNCH
 	KASSERT(lock != NULL);
 	KASSERT(lock_do_i_hold(lock)); /*bloccati se non c'è ownership*/
-	
-	/*prima di fare wakeone devo acquisire lo spinlock*/
 	spinlock_acquire(&lock->lock_spinlock);
+	/*prima di fare wakeone devo acquisire lo spinlock*/
 	lock->thread_who_acquired = NULL;
 #if SEM        
         V(lock->lock_sem); //versione con semaforo
@@ -262,10 +261,13 @@ lock_do_i_hold(struct lock *lock)
         // Write this
 #if OPT_SYNCH
 	bool result;
-	
+#if SEM
 	spinlock_acquire(&lock->lock_spinlock);
 	result = lock->thread_who_acquired == curthread;
 	spinlock_release(&lock->lock_spinlock);
+#else
+	result = lock->thread_who_acquired == curthread;
+#endif
 	return result;
 #endif
         (void)lock;  // suppress warning until code gets written

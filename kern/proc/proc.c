@@ -295,9 +295,9 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
+	proc_end_waitpid(proc);
 	KASSERT(proc->p_numthreads == 0);
 
-	proc_end_waitpid(proc);
 	spinlock_cleanup(&proc->p_spinlock);
 
 	kfree(proc->p_name);
