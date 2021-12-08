@@ -64,7 +64,7 @@ get_aligned_length( char arg[ARG_MAX], int alignment ) {
 
 static
 int
-copy_args( userptr_t uargs, int *nargs, int *buflen ) {
+copy_args( char ** args, int *nargs, int *buflen ) {
 	int		i = 0;
 	int		err;
 	int		nlast = 0;
@@ -75,7 +75,7 @@ copy_args( userptr_t uargs, int *nargs, int *buflen ) {
 	uint32_t	last_offset;
 
 	//check whether we got a valid pointer.
-	if( uargs == NULL )
+	if( args == NULL )
 		return EFAULT;
 
 	//initialize the numbe of arguments and the buffer size
@@ -84,7 +84,7 @@ copy_args( userptr_t uargs, int *nargs, int *buflen ) {
 
 	//copy-in kargs.
 	i = 0;
-	while( ( err = copyin( (userptr_t)uargs + i * 4, &ptr, sizeof( ptr ) ) ) == 0 ) {
+	while( ( err = copyin( (userptr_t)args + i * 4, &ptr, sizeof( ptr ) ) ) == 0 ) {
 		if( ptr == NULL )
 			break;
 		err = copyinstr( (userptr_t)ptr, karg, sizeof( karg ), NULL );
@@ -112,7 +112,7 @@ copy_args( userptr_t uargs, int *nargs, int *buflen ) {
 	p_end = kargbuf + (*nargs * sizeof( char * ));
 	nlast = 0;
 	last_offset = *nargs * sizeof( char * );
-	while( ( err = copyin( (userptr_t)uargs + i * 4, &ptr, sizeof( ptr ) ) ) == 0 ) {
+	while( ( err = copyin( (userptr_t)args + i * 4, &ptr, sizeof( ptr ) ) ) == 0 ) {
 		if( ptr == NULL )
 			break;
 		err = copyinstr( (userptr_t)ptr, karg, sizeof( karg ), NULL );
@@ -174,7 +174,7 @@ adjust_kargbuf( int nparams, vaddr_t stack_ptr ) {
 }
 
 int	
-sys_execv( userptr_t upname, userptr_t uargs ) {
+sys_execv( char * progname, char ** args ) {
 	struct addrspace		*as_new = NULL;
 	struct addrspace		*as_old = NULL;
 	struct vnode			*vn = NULL;
@@ -188,7 +188,7 @@ sys_execv( userptr_t upname, userptr_t uargs ) {
 	KASSERT( curthread != NULL );
 	KASSERT( curthread->t_proc != NULL );
 	
-	(void)uargs;
+	(void)args;
 	
 	//lock the execv args
 	lock_acquire( lk_exec ); //defined in proc.h
@@ -197,7 +197,7 @@ sys_execv( userptr_t upname, userptr_t uargs ) {
 	as_old = curproc->p_addrspace;
 
 	//copyin the program name.
-	err = copyinstr( upname, kpname, sizeof( kpname ), NULL );
+	err = copyinstr( progname, kpname, sizeof( kpname ), NULL );
 	if( err ) {
 		lock_release( lk_exec );
 		return err;
@@ -211,7 +211,7 @@ sys_execv( userptr_t upname, userptr_t uargs ) {
 	}
 
 	//copy the arguments into the kernel buffer.
-	err = copy_args( uargs, &nargs, &buflen );
+	err = copy_args( args, &nargs, &buflen );
 	if( err ) {
 		lock_release( lk_exec );
 		vfs_close( vn );
