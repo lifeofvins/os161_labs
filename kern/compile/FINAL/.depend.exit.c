@@ -1,4 +1,4 @@
-proc_syscalls.o: ../../syscall/proc_syscalls.c ../../include/types.h \
+exit.o: ../../syscall/exit.c ../../include/types.h \
  ../../include/kern/types.h includelinks/kern/machine/types.h \
  includelinks/machine/types.h ../../include/kern/unistd.h \
  ../../include/kern/errno.h ../../include/kern/fcntl.h \
@@ -13,7 +13,6 @@ proc_syscalls.o: ../../syscall/proc_syscalls.c ../../include/types.h \
  includelinks/machine/current.h ../../include/thread.h \
  ../../include/array.h ../../include/threadlist.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h includelinks/mips/trapframe.h \
- ../../include/synch.h opt-synch.h ../../include/spl.h \
- ../../include/vnode.h ../../include/vfs.h ../../include/test.h \
- ../../include/kern/wait.h
+ includelinks/kern/machine/setjmp.h ../../include/synch.h opt-synch.h \
+ ../../include/spl.h ../../include/vnode.h ../../include/vfs.h \
+ ../../include/test.h ../../include/kern/wait.h
