@@ -72,7 +72,7 @@ struct vnode;
 #define USE_SEMAPHORE_FOR_WAITPID 0
 #endif
 
-
+#define MAX_PROC 100
 struct proc {
 	char *p_name;			/* Name of this process */
 	struct spinlock p_spinlock;		/* Lock for this structure */
@@ -114,6 +114,8 @@ struct proc {
 #endif
 };
 
+extern struct lock *lk_exec;
+
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
 
@@ -150,9 +152,6 @@ void proc_signal_end(struct proc *proc);
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
 
-#if OPT_FORK
-void proc_add_child(struct proc *parent, struct proc *child);
-#endif
 
 
 //#if OPT_EXECV

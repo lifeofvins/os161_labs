@@ -214,7 +214,7 @@ void syscall(struct trapframe *tf)
 
 #if OPT_EXECV
 	case SYS_execv:
-		err = sys_execv((char *)tf->tf_a0, (char **)tf->tf_a1);
+		err = sys_execv((userptr_t)tf->tf_a0, (userptr_t)tf->tf_a1);
 		break;
 #endif
 #endif /*OPT_SYSCALLS*/
@@ -255,30 +255,3 @@ void syscall(struct trapframe *tf)
 	KASSERT(curthread->t_iplhigh_count == 0);
 }
 
-/*
- * Enter user mode for a newly forked process.
- *
- * This function is provided as a reminder. You need to write
- * both it and the code that calls it.
- *
- * Thus, you can trash it and do things another way if you prefer.
- */
-void enter_forked_process(struct trapframe *tf)
-{
-#if OPT_FORK
-	// Duplicate frame so it's on stack
-	struct trapframe forkedTf = *tf; // copy trap frame onto kernel stack
-
-	forkedTf.tf_v0 = 0; // return value is 0
-	forkedTf.tf_a3 = 0; // return with success
-
-	forkedTf.tf_epc += 4; // return to next instruction
-
-	/*activate the addrspace*/
-	as_activate();
-
-	mips_usermode(&forkedTf);
-#else
-	(void)tf;
-#endif
-}

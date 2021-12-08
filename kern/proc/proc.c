@@ -58,7 +58,7 @@
 #include <synch.h>
 #include <kern/wait.h>
 
-#define MAX_PROC 100
+
 static struct _processTable {
   int active;           /* initial value 0 */
   struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
@@ -67,6 +67,7 @@ static struct _processTable {
 
 } processTable;
 
+struct lock *lk_exec;
 #endif
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -345,6 +346,10 @@ proc_bootstrap(void)
 	spinlock_init(&processTable.lk);
 	/* kernel process is not registered in the table */
 	processTable.active = 1;
+	lk_exec = lock_create("lk_exec");
+	if (lk_exec == NULL) {
+		panic("Could not create lk_exec.\n");
+	}
 #endif
 }
 
@@ -557,16 +562,6 @@ proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
 
 #endif
 
-#if OPT_FORK
-void 
-proc_add_child(struct proc *parent, struct proc *child) {
-
-	KASSERT (parent != NULL);
-	KASSERT (child != NULL);
-	unsigned index_ret = (unsigned)child->p_pid;
-	array_add(parent->p_children, (void *)child, &index_ret); /*potrei avere un errore*/
-}
-#endif
 
 
 #if OPT_EXECV
