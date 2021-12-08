@@ -114,7 +114,7 @@ struct proc {
 #endif
 };
 
-extern struct lock *lk_exec;
+extern struct lock *exec_lock; /*lock used in sys_execv: created in proc_bootstrap() function*/
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
