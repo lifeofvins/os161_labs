@@ -13,92 +13,94 @@
 #include <vfs.h>
 #include <syscall.h>
 
-static char **kargs; 
-static unsigned char kargsbuf[ARG_MAX];
+static char **kargs;
+static unsigned char kargbuf[ARG_MAX];
 
 #define MAX_PROG_NAME 32
 
-/**
- * given a string, and an align parameter
- * this function will align its length (by appending zero) to match the required alignment.
- */
-static int
-align_arg(char arg[ARG_MAX], int align)
+static void kfree_args(void **args)
 {
-	char *p = arg;
-	int len = 0;
-	int diff;
-
-	while (*p++ != '\0')
-		++len;
-
-	if (++len % align == 0)
-		return len;
-
-	diff = align - (len % align);
-	while (diff--)
+	/*this function frees all the string arrays allocated during execv*/
+	int i = 0;
+	while (args[i] != NULL)
 	{
-		*(++p) = '\0';
-		++len;
+		args[i] = NULL;
+		kfree(args[i]);
+		i++;
 	}
-
-	return len;
+	kfree(args[i]); //NULL value
+	kfree(args);
+	return;
 }
 
 /**
  * return the nearest length aligned to alignment.
  */
 static int
-get_aligned_length(char arg[ARG_MAX], int alignment)
+get_aligned_length(char *arg, int alignment)
 {
-	char *p = arg;
 	int len = 0;
 
-	while (*p++ != '\0')
-		++len;
-
-	if (++len % 4 == 0)
+	while (arg[len] != '\0')
+		len++;
+	len++; /*'\0' character*/
+	if (len % 4 == 0)
 		return len;
 
-	return len + (alignment - (len % alignment));
+	return len + (alignment - (len % alignment)); //padding
 }
 
 static int
-copy_args(char ** args, int *nargs, int *buflen)
+copy_args(char **args, int *argc, int *buflen)
 {
 	int i = 0;
 	int err;
 	int nlast = 0;
-	char *ptr; /*size = 4 bytes*/
 	unsigned char *p_begin = NULL;
 	unsigned char *p_end = NULL;
 	uint32_t offset;
 	uint32_t last_offset;
-	int argc;
+	int len;
 
 	//initialize the number of arguments and the buffer size
-	*nargs = 0;
+	*argc = 0;
 	*buflen = 0;
 
 	/*count number of arguments*/
-	argc = 0;
-	while (args[argc] != NULL) {
-		argc++;
+	while (args[*argc] != NULL)
+	{
+		*argc++;
+	}
+		KASSERT(argc != NULL);
+	if (*argc >= ARG_MAX)
+	{
+		return E2BIG;
+	}
+	int dim = *argc; /*for more readability*/
+	kargs = (char **)kmalloc(dim * sizeof(char **));
+	if (kargs == NULL)
+	{
+		return ENOMEM;
 	}
 
 	//copy-in kargs.
-	i = 0;
-	while ((err = copyin((const_userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
+	for (i = 0; i < dim; i++)
 	{
-		if (ptr == NULL)
-			break;
-		err = copyinstr((const_userptr_t)ptr, kargs, sizeof(kargs), NULL);
+		len = strlen(args[i]) + 1;
+		kargs[i] = (char *)kmalloc(len * sizeof(char *));
+		if (kargs[i] == NULL)
+		{
+			kfree_args((void **)kargs);
+			return ENOMEM;
+		}
+		err = copyinstr((userptr_t)args[i], kargs[i], len, NULL);
 		if (err)
+		{
+			kfree_args((void **)kargs);
 			return err;
-
-		++i;
-		*nargs += 1;
-		*buflen += get_aligned_length(kargs, 4) + sizeof(char *);
+		}
+		/*align by 4 for buffer*/
+		*buflen += get_aligned_length(kargs[i], 4) + sizeof(char *);
 	}
 
 	//if there is a problem, and we haven't read a single argument
@@ -106,26 +108,19 @@ copy_args(char ** args, int *nargs, int *buflen)
 	if (i == 0 && err)
 		return err;
 
-	//account for NULL also.
-	*nargs += 1;
+	//the last argument is NULL
+	*argc += 1;
 	*buflen += sizeof(char *);
 
 	//loop over the arguments again, building karbuf.
-	i = 0;
-	p_begin = kargsbuf;
-	p_end = kargsbuf + (*nargs * sizeof(char *));
+	p_begin = kargbuf;
+	p_end = kargbuf + (*argc * sizeof(char *));
 	nlast = 0;
-	last_offset = *nargs * sizeof(char *);
-	while ((err = copyin((userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
+	last_offset = *argc * sizeof(char *);
+	for (i = 0; i < *argc; i++)
 	{
-		if (ptr == NULL)
-			break;
-		err = copyinstr((userptr_t)ptr, kargs, sizeof(kargs), NULL);
-		if (err)
-			return err;
-
 		offset = last_offset + nlast;
-		nlast = align_arg(kargs, 4);
+		nlast = get_aligned_length(kargs[i], 4);
 
 		//copy the integer into 4 bytes.
 		*p_begin = offset & 0xff;
@@ -142,7 +137,6 @@ copy_args(char ** args, int *nargs, int *buflen)
 
 		//adjust last offset
 		last_offset = offset;
-		++i;
 	}
 
 	//set the NULL pointer (i.e., it takes 4 zero bytes.)
@@ -166,20 +160,20 @@ adjust_kargsbuf(int nparams, vaddr_t stack_ptr)
 	{
 		index = i * sizeof(char *);
 		//read the old offset.
-		old_offset = ((0xFF & kargsbuf[index + 3]) << 24) | ((0xFF & kargsbuf[index + 2]) << 16) |
-					 ((0xFF & kargsbuf[index + 1]) << 8) | (0xFF & kargsbuf[index]);
+		old_offset = ((0xFF & kargbuf[index + 3]) << 24) | ((0xFF & kargbuf[index + 2]) << 16) |
+					 ((0xFF & kargbuf[index + 1]) << 8) | (0xFF & kargbuf[index]);
 
 		//calculate the new offset
 		new_offset = stack_ptr + old_offset;
 
 		//store it instead of the old one.
-		memcpy(kargsbuf + index, &new_offset, sizeof(int));
+		memcpy(kargbuf + index, &new_offset, sizeof(int));
 	}
 
 	return 0;
 }
 
-int sys_execv(char * progname, char ** args)
+int sys_execv(char *progname, char **args)
 {
 	struct addrspace *newas = NULL;
 	struct addrspace *oldas = NULL;
@@ -188,13 +182,14 @@ int sys_execv(char * progname, char ** args)
 	vaddr_t stack_ptr;
 	int err;
 	char *kprogram;
-	int nargs;
-	int buflen;
+	int argc;
+	int buflen; /*how much does the stackptr have to shift*/
 	int len;
 
 	KASSERT(curproc != NULL);
 	/*parameters check*/
-	if (progname == NULL || args == NULL) {
+	if (progname == NULL || args == NULL)
+	{
 		return EFAULT;
 	}
 	//lock the execv args
@@ -204,11 +199,17 @@ int sys_execv(char * progname, char ** args)
 	oldas = curproc->p_addrspace;
 
 	//copyin the program name.
-	len = strlen(progname)+1;
+	len = strlen(progname) + 1;
 	kprogram = kmalloc(len);
+	if (kprogram == NULL)
+	{
+		return ENOMEM;
+	}
 	err = copyinstr((const_userptr_t)progname, kprogram, len, NULL);
 	if (err)
 	{
+		kfree_args((void **)kargs);
+		kfree(kprogram);
 		lock_release(lk_exec);
 		return err;
 	}
@@ -221,8 +222,9 @@ int sys_execv(char * progname, char ** args)
 		return err;
 	}
 
-	//copy the arguments into the kernel buffer.
-	err = copy_args(args, &nargs, &buflen);
+	//copy the arguments into the kernel buffer
+	//and build the user buffer (&buflen)to copy into user stack.
+	err = copy_args(args, &argc, &buflen);
 	if (err)
 	{
 		lock_release(lk_exec);
@@ -273,7 +275,7 @@ int sys_execv(char * progname, char ** args)
 
 	//adjust the stackptr to reflect the change
 	stack_ptr -= buflen;
-	err = adjust_kargsbuf(nargs, stack_ptr);
+	err = adjust_kargsbuf(argc, stack_ptr);
 	if (err)
 	{
 		curproc->p_addrspace = oldas;
@@ -286,7 +288,7 @@ int sys_execv(char * progname, char ** args)
 	}
 
 	//copy the arguments into the new user stack.
-	err = copyout(kargsbuf, (userptr_t)stack_ptr, buflen);
+	err = copyout(kargbuf, (userptr_t)stack_ptr, buflen);
 	if (err)
 	{
 		curproc->p_addrspace = oldas;
@@ -307,7 +309,7 @@ int sys_execv(char * progname, char ** args)
 	as_destroy(oldas);
 
 	//off we go to userland.
-	enter_new_process(nargs - 1, (userptr_t)stack_ptr, NULL, stack_ptr, entry_ptr);
+	enter_new_process(argc - 1, (userptr_t)stack_ptr, NULL, stack_ptr, entry_ptr);
 
 	panic("execv: we should not be here.");
 	return EINVAL;
