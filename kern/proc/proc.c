@@ -67,7 +67,7 @@ static struct _processTable {
 
 } processTable;
 
-struct lock *exec_lock;
+struct lock *lk_exec;
 #endif
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -346,9 +346,9 @@ proc_bootstrap(void)
 	spinlock_init(&processTable.lk);
 	/* kernel process is not registered in the table */
 	processTable.active = 1;
-	exec_lock = lock_create("exec_lock");
-	if (exec_lock == NULL) {
-		panic("Could not create exec_lock.\n");
+	lk_exec = lock_create("lk_exec");
+	if (lk_exec == NULL) {
+		panic("Could not create lk_exec.\n");
 	}
 #endif
 }
