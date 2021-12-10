@@ -87,7 +87,7 @@ pid_t sys_getpid(void);
 int sys_fork(struct trapframe *ctf, pid_t *retval);
 #endif /*OPT_FORK*/
 #if OPT_EXECV
-int sys_execv(char * upname, char ** uargs);
+int sys_execv(userptr_t upname, userptr_t uargs);
 #endif /*OPT_EXECV*/
 #endif /*OPT_SYSCALLS*/
 
