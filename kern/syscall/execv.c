@@ -64,7 +64,7 @@ get_aligned_length(char arg[ARG_MAX], int alignment)
 }
 
 static int
-copy_args(userptr_t uargs, int *nargs, int *buflen)
+copy_args(char ** uargs, int *nargs, int *buflen)
 {
 	int i = 0;
 	int err;
@@ -176,7 +176,7 @@ adjust_kargbuf(int nparams, vaddr_t stackptr)
 	return 0;
 }
 
-int sys_execv(userptr_t upname, userptr_t uargs)
+int sys_execv(char * upname, char ** uargs)
 {
 	struct addrspace *newas = NULL;
 	struct addrspace *oldas = NULL;
@@ -205,7 +205,7 @@ int sys_execv(userptr_t upname, userptr_t uargs)
 		return err;
 	}
 	//copyin the program name.
-	err = copyinstr(upname, kpname, sizeof(kpname), NULL);
+	err = copyinstr((userptr_t)upname, kpname, sizeof(kpname), NULL);
 	if (err)
 	{
 		lock_release(exec_lock);
