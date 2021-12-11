@@ -67,7 +67,6 @@ static struct _processTable {
 
 } processTable;
 
-struct lock *exec_lock;
 #endif
 /*
  * The process for the kernel; this holds all the kernel-only threads.
