@@ -34,7 +34,7 @@ padded_length(char *arg, int alignment)
 }
 
 static int
-copy_args(char **args, int *argc, int *buflen)
+copy_args_to_kbuf(char **args, int *argc, int *buflen)
 {
 	int i;
 	int err;
@@ -144,7 +144,7 @@ int sys_execv(char *program, char **args)
 	lock_acquire(exec_lock);
 
 	//copy the arguments into the kernel buffer.
-	err = copy_args(args, &argc, &buflen);
+	err = copy_args_to_kbuf(args, &argc, &buflen);
 	if (err)
 	{
 		lock_release(exec_lock);
@@ -166,7 +166,7 @@ int sys_execv(char *program, char **args)
 		return err;
 	}
 
-	//try to open the given executable.
+	//open the given executable.
 	err = vfs_open(kprogram, O_RDONLY, 0, &vn);
 	if (err)
 	{
@@ -191,7 +191,7 @@ int sys_execv(char *program, char **args)
 	err = load_elf(vn, &entrypoint);
 	if (err)
 	{
-		curproc->p_addrspace = oldas;
+		proc_setas(oldas);
 		as_activate();
 
 		as_destroy(newas);
@@ -228,7 +228,7 @@ int sys_execv(char *program, char **args)
 	}
 
 	//copy the arguments into the new user stack.
-	err = copyout(kargbuf, (userptr_t)stackptr, buflen);
+	err = copyout((void *)kargbuf, (userptr_t)stackptr, buflen);
 	if (err)
 	{
 		proc_setas(oldas);
