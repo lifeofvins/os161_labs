@@ -22,7 +22,7 @@ static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
  * return the nearest length aligned to alignment.
  */
 static int
-get_aligned_length(char *arg, int alignment)
+padded_length(char *arg, int alignment)
 {
 	int len = strlen(arg)+1;
 
@@ -56,13 +56,13 @@ copy_args(char **args, int *argc, int *buflen)
 
 		++i;
 		*argc += 1;
-		*buflen += get_aligned_length(karg, 4) + sizeof(char *);
+		*buflen += padded_length(karg, 4) + sizeof(char *); /*how much will the stackptr have to shift*/
 	}
 	//account for NULL also.
 	*argc += 1;
 	*buflen += sizeof(char *);
 
-	//loop over the arguments again, building karbuf.
+	//loop over the arguments again, building kargbuf.
 	i = 0;
 	p_begin = kargbuf;
 	p_end = kargbuf + (*argc * sizeof(char *));
@@ -74,8 +74,9 @@ copy_args(char **args, int *argc, int *buflen)
 		if (err)
 			return err;
 
+		/*now I have in karg the i-th argument*/
 		offset = last_offset + nlast;
-		nlast = get_aligned_length(karg, 4);
+		nlast = padded_length(karg, 4);
 		//copy the integer into 4 bytes.
 		*p_begin = offset & 0xff;
 		*(p_begin + 1) = (offset >> 8) & 0xff;
@@ -83,6 +84,10 @@ copy_args(char **args, int *argc, int *buflen)
 		*(p_begin + 3) = (offset >> 24) & 0xff;
 
 		//copy the string the buffer.
+		/*
+		 *void *memcpy(void *dest, const void *src, size_t len);
+		 *copies n characters from memory area src to memory area dest.
+		 */
 		memcpy(p_end, karg, nlast);
 		p_end += nlast;
 
@@ -192,8 +197,6 @@ int sys_execv(char *program, char **args)
 	oldas = proc_setas(newas); //proc_setas returns the old addrspace
 	as_activate();
 
-	//temporarily switch the addrspaces.
-	curproc->p_addrspace = newas;
 
 	//load the elf executable.
 	err = load_elf(vn, &entrypoint);
@@ -212,7 +215,7 @@ int sys_execv(char *program, char **args)
 	err = as_define_stack(newas, &stackptr);
 	if (err)
 	{
-		curproc->p_addrspace = oldas;
+		proc_setas(oldas);
 		as_activate();
 
 		as_destroy(newas);
@@ -226,7 +229,7 @@ int sys_execv(char *program, char **args)
 	err = adjust_kargbuf(argc, stackptr);
 	if (err)
 	{
-		curproc->p_addrspace = oldas;
+		proc_setas(oldas);
 		as_activate();
 
 		as_destroy(newas);
@@ -239,7 +242,7 @@ int sys_execv(char *program, char **args)
 	err = copyout(kargbuf, (userptr_t)stackptr, buflen);
 	if (err)
 	{
-		curproc->p_addrspace = oldas;
+		proc_setas(oldas);
 		as_activate();
 		as_destroy(newas);
 		vfs_close(vn);
@@ -247,16 +250,12 @@ int sys_execv(char *program, char **args)
 		return err;
 	}
 
-	//reelase exec_lock
 	lock_release(exec_lock);
 
-	//no need for it anymore.
 	vfs_close(vn);
 
-	//we are good to go.
 	as_destroy(oldas);
 
-	//off we go to userland.
 	enter_new_process(argc - 1, (userptr_t)stackptr, NULL, stackptr, entrypoint);
 
 	panic("execv: we should not be here.");
