@@ -24,12 +24,7 @@ static unsigned char kargbuf[ARG_MAX];
 static int
 get_aligned_length(char *arg, int alignment)
 {
-	int len = 0;
-
-	while (arg[len] != '\0')
-		len++;
-
-	len++;
+	int len = strlen(arg)+1;
 
 	if (len % 4 == 0)
 		return len;
