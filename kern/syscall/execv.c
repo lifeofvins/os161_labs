@@ -13,7 +13,7 @@
 #include <vfs.h>
 #include <syscall.h>
 
-static char karg[ARG_MAX]; /*argument string, it's not a string array*/
+static char karg[ARG_MAX];			   /*argument string, it's not a string array*/
 static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
 
 #define MAX_PROG_NAME 32
@@ -24,7 +24,7 @@ static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
 static int
 padded_length(char *arg, int alignment)
 {
-	int len = strlen(arg)+1;
+	int len = strlen(arg) + 1;
 
 	if (len % 4 == 0)
 		return len;
@@ -37,7 +37,7 @@ copy_args(char **args, int *argc, int *buflen)
 {
 	int i;
 	int err;
-	int nlast = 0;
+	int nlast = 0; /*last argument*/
 	unsigned char *p_begin = NULL;
 	unsigned char *p_end = NULL;
 	int offset;
@@ -46,28 +46,16 @@ copy_args(char **args, int *argc, int *buflen)
 	//initialize the number of arguments and the buffer size
 	*argc = 0;
 	*buflen = 0;
-	//copy-in kargs.
-	i = 0;
-	while (args[i] != NULL) //the last argument is NULL
-	{
-		err = copyinstr((userptr_t)args[i], karg, sizeof(karg), NULL);
-		if (err)
-			return err;
+	/*find how many arguments*/
+	for (i = 0; args[i] != NULL; i++)
+		;
+	*argc = i + 1; //count also the last NULL argument
 
-		++i;
-		*argc += 1;
-		*buflen += padded_length(karg, 4) + sizeof(char *); /*how much will the stackptr have to shift*/
-	}
-	//account for NULL also.
-	*argc += 1;
-	*buflen += sizeof(char *);
-
-	//loop over the arguments again, building kargbuf.
-	i = 0;
 	p_begin = kargbuf;
 	p_end = kargbuf + (*argc * sizeof(char *));
 	nlast = 0;
 	last_offset = *argc * sizeof(char *);
+	i = 0;
 	while (args[i] != NULL)
 	{
 		err = copyinstr((userptr_t)args[i], karg, sizeof(karg), NULL);
@@ -96,7 +84,9 @@ copy_args(char **args, int *argc, int *buflen)
 
 		//adjust last offset
 		last_offset = offset;
+
 		++i;
+		*buflen += padded_length(karg, 4) + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
 	}
 
 	//set the NULL pointer (i.e., it takes 4 zero bytes.)
@@ -105,6 +95,7 @@ copy_args(char **args, int *argc, int *buflen)
 	*(p_begin + 2) = 0;
 	*(p_begin + 3) = 0;
 
+	*buflen += sizeof(char *);
 	return 0;
 }
 
@@ -163,9 +154,10 @@ int sys_execv(char *program, char **args)
 		return err;
 	}
 	//copyin the program name.
-	len = strlen(program)+1;
+	len = strlen(program) + 1;
 	kprogram = kmalloc(len);
-	if (kprogram == NULL) {
+	if (kprogram == NULL)
+	{
 		lock_release(exec_lock);
 		return ENOMEM;
 	}
@@ -196,7 +188,6 @@ int sys_execv(char *program, char **args)
 	//activate the new addrspace.
 	oldas = proc_setas(newas); //proc_setas returns the old addrspace
 	as_activate();
-
 
 	//load the elf executable.
 	err = load_elf(vn, &entrypoint);
