@@ -69,7 +69,8 @@ copy_args(char **args, int *argc, int *buflen)
 		offset = last_offset + nlast;
 		nlast = padded_length(karg, 4);
 
-		*p_begin = offset & 0xff;
+		/*convert int to 4 bytes*/
+		*p_begin = offset & 0xff; /*first element*/
 		*(p_begin + 1) = (offset >> 8) & 0xff;
 		*(p_begin + 2) = (offset >> 16) & 0xff;
 		*(p_begin + 3) = (offset >> 24) & 0xff;
@@ -82,7 +83,7 @@ copy_args(char **args, int *argc, int *buflen)
 		memcpy(p_end, karg, nlast);
 		p_end += nlast;
 
-		//advance p_begin by 4 bytes.
+		//advance p_begin by 4 bytes --> go to next argument for next iteration.
 		p_begin += 4;
 
 		//adjust last offset
@@ -91,12 +92,6 @@ copy_args(char **args, int *argc, int *buflen)
 		++i;
 		*buflen += padded_length(karg, 4) + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
 	}
-
-	//set the NULL pointer (i.e., it takes 4 zero bytes.)
-	*p_begin = 0;
-	*(p_begin + 1) = 0;
-	*(p_begin + 2) = 0;
-	*(p_begin + 3) = 0;
 
 	*buflen += sizeof(char *);
 	return 0;
