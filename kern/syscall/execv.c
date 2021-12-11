@@ -14,7 +14,7 @@
 #include <syscall.h>
 
 static char karg[ARG_MAX]; /*argument string, it's not a string array*/
-static unsigned char kargbuf[ARG_MAX];
+static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
 
 #define MAX_PROG_NAME 32
 
@@ -33,60 +33,44 @@ get_aligned_length(char *arg, int alignment)
 }
 
 static int
-copy_args(char **args, int *nargs, int *buflen)
+copy_args(char **args, int *argc, int *buflen)
 {
-	int i = 0;
+	int i;
 	int err;
 	int nlast = 0;
-	char *ptr;
 	unsigned char *p_begin = NULL;
 	unsigned char *p_end = NULL;
 	uint32_t offset;
 	uint32_t last_offset;
 
-	//check whether we got a valid pointer.
-	if (args == NULL)
-		return EFAULT;
-
-	//initialize the numbe of arguments and the buffer size
-	*nargs = 0;
+	//initialize the number of arguments and the buffer size
+	*argc = 0;
 	*buflen = 0;
-
 	//copy-in kargs.
 	i = 0;
-	while ((err = copyin((userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
+	while (args[i] != NULL) //the last argument is NULL
 	{
-		if (ptr == NULL)
-			break;
-		err = copyinstr((userptr_t)ptr, karg, sizeof(karg), NULL);
+		err = copyinstr((userptr_t)args[i], karg, sizeof(karg), NULL);
 		if (err)
 			return err;
 
 		++i;
-		*nargs += 1;
+		*argc += 1;
 		*buflen += get_aligned_length(karg, 4) + sizeof(char *);
 	}
-
-	//if there is a problem, and we haven't read a single argument
-	//that means the given user argument pointer is invalid.
-	if (i == 0 && err)
-		return err;
-
 	//account for NULL also.
-	*nargs += 1;
+	*argc += 1;
 	*buflen += sizeof(char *);
 
 	//loop over the arguments again, building karbuf.
 	i = 0;
 	p_begin = kargbuf;
-	p_end = kargbuf + (*nargs * sizeof(char *));
+	p_end = kargbuf + (*argc * sizeof(char *));
 	nlast = 0;
-	last_offset = *nargs * sizeof(char *);
-	while ((err = copyin((userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
+	last_offset = *argc * sizeof(char *);
+	while (args[i] != NULL)
 	{
-		if (ptr == NULL)
-			break;
-		err = copyinstr((userptr_t)ptr, karg, sizeof(karg), NULL);
+		err = copyinstr((userptr_t)args[i], karg, sizeof(karg), NULL);
 		if (err)
 			return err;
 
@@ -153,7 +137,7 @@ int sys_execv(char *program, char **args)
 	vaddr_t stackptr;
 	int err;
 	char *kprogram;
-	int nargs;
+	int argc;
 	int buflen;
 	int len;
 
@@ -166,7 +150,7 @@ int sys_execv(char *program, char **args)
 	lock_acquire(exec_lock);
 
 	//copy the arguments into the kernel buffer.
-	err = copy_args(args, &nargs, &buflen);
+	err = copy_args(args, &argc, &buflen);
 	if (err)
 	{
 		lock_release(exec_lock);
@@ -239,7 +223,7 @@ int sys_execv(char *program, char **args)
 
 	//adjust the stackptr to reflect the change
 	stackptr -= buflen;
-	err = adjust_kargbuf(nargs, stackptr);
+	err = adjust_kargbuf(argc, stackptr);
 	if (err)
 	{
 		curproc->p_addrspace = oldas;
@@ -273,7 +257,7 @@ int sys_execv(char *program, char **args)
 	as_destroy(oldas);
 
 	//off we go to userland.
-	enter_new_process(nargs - 1, (userptr_t)stackptr, NULL, stackptr, entrypoint);
+	enter_new_process(argc - 1, (userptr_t)stackptr, NULL, stackptr, entrypoint);
 
 	panic("execv: we should not be here.");
 	return EINVAL;
