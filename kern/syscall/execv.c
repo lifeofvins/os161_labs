@@ -69,18 +69,18 @@ copy_args(char **args, int *argc, int *buflen)
 		offset = last_offset + nlast;
 		nlast = padded_length(karg, 4);
 
-		/*convert int to 4 bytes*/
-		*p_begin = offset & 0xff; /*first element*/
-		*(p_begin + 1) = (offset >> 8) & 0xff;
-		*(p_begin + 2) = (offset >> 16) & 0xff;
-		*(p_begin + 3) = (offset >> 24) & 0xff;
-
 		//copy the string the buffer.
 		/*
 		 *void *memcpy(void *dest, const void *src, size_t len);
 		 *copies n characters from memory area src to memory area dest.
 		 */
 		memcpy(p_end, karg, nlast);
+		/*convert int to 4 bytes*/
+		*p_begin = offset & 0xff; /*first element*/
+		*(p_begin + 1) = (offset >> 8) & 0xff;
+		*(p_begin + 2) = (offset >> 16) & 0xff;
+		*(p_begin + 3) = (offset >> 24) & 0xff;
+
 		p_end += nlast;
 
 		//advance p_begin by 4 bytes --> go to next argument for next iteration.
@@ -101,8 +101,8 @@ static int
 adjust_kargbuf(int nparams, vaddr_t stackptr)
 {
 	int i;
-	uint32_t new_offset = 0;
-	uint32_t old_offset = 0;
+	int new_offset = 0;
+	int old_offset = 0;
 	int index;
 
 	for (i = 0; i < nparams - 1; ++i)
