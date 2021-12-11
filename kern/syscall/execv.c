@@ -19,33 +19,6 @@ static unsigned char kargbuf[ARG_MAX];
 #define MAX_PROG_NAME 32
 
 /**
- * given a string, and an align parameter
- * this function will align its length (by appending zero) to match the required alignment.
- */
-static int
-align_arg(char *arg, int align)
-{
-	int len = 0;
-	int diff;
-
-	while (arg[len] != '\0')
-		len++;
-
-	len++; /*last character*/
-	if (len % align == 0)
-		return len;
-
-	diff = align - (len % align);
-	while (diff--)
-	{
-		arg[len] = '\0';
-		len++;
-	}
-
-	return len;
-}
-
-/**
  * return the nearest length aligned to alignment.
  */
 static int
@@ -123,8 +96,7 @@ copy_args(char **uargs, int *nargs, int *buflen)
 			return err;
 
 		offset = last_offset + nlast;
-		nlast = align_arg(karg, 4);
-
+		nlast = get_aligned_length(karg, 4);
 		//copy the integer into 4 bytes.
 		*p_begin = offset & 0xff;
 		*(p_begin + 1) = (offset >> 8) & 0xff;
