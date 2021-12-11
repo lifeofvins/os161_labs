@@ -46,7 +46,7 @@ copy_args(char **args, int *argc, int *buflen)
 
 	//initialize the number of arguments and the buffer size
 	*argc = 0;
-	
+
 	*buflen = 0;
 	/*find how many arguments*/
 	for (i = 0; args[i] != NULL; i++)
@@ -70,6 +70,9 @@ copy_args(char **args, int *argc, int *buflen)
 		nlast = padded_length(karg, 4);
 
 		*p_begin = offset & 0xff;
+		*(p_begin + 1) = (offset >> 8) & 0xff;
+		*(p_begin + 2) = (offset >> 16) & 0xff;
+		*(p_begin + 3) = (offset >> 24) & 0xff;
 
 		//copy the string the buffer.
 		/*
