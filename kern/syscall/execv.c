@@ -38,10 +38,10 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 {
 	int i;
 	int err;
-	int nlast = 0; /*last argument*/
+	int padding = 0; /*last argument*/
 	unsigned char *p_begin = NULL;
 	unsigned char *p_end = NULL;
-	int offset;
+	volatile int offset; //volatile so it isn't optimized out during debug
 	int last_offset;
 
 	//initialize the number of arguments and the buffer size
@@ -54,10 +54,10 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 	*argc = i + 1; //count also the last NULL argument
 
 	/*initialize kernel buffer*/
-	p_begin = kargbuf;
+	p_begin = kargbuf; /*they both point to the same memory region*/
 	last_offset = *argc * sizeof(char *);
 	p_end = p_begin + last_offset;
-	nlast = 0;
+	padding = 0;
 	i = 0;
 	while (args[i] != NULL)
 	{
@@ -66,22 +66,19 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 			return err;
 
 		/*now I have in karg the i-th argument*/
-		offset = last_offset + nlast;
-		nlast = padded_length(karg, 4);
+		offset = last_offset + padding;
+		padding = padded_length(karg, 4);
 
 		//copy the string the buffer.
 		/*
 		 *void *memcpy(void *dest, const void *src, size_t len);
 		 *copies n characters from memory area src to memory area dest.
 		 */
-		memcpy(p_end, karg, nlast);
+		memcpy(p_end, karg, padding);
 		/*convert int to 4 bytes*/
-		*p_begin = offset & 0xff; /*first element*/
-		*(p_begin + 1) = (offset >> 8) & 0xff;
-		*(p_begin + 2) = (offset >> 16) & 0xff;
-		*(p_begin + 3) = (offset >> 24) & 0xff;
+		*p_begin = offset; /*first element*/
 
-		p_end += nlast;
+		p_end += padding;
 
 		//advance p_begin by 4 bytes --> go to next argument for next iteration.
 		p_begin += 4;
@@ -107,10 +104,9 @@ adjust_kargbuf(int nparams, vaddr_t stackptr)
 
 	for (i = 0; i < nparams - 1; ++i)
 	{
-		index = i * sizeof(char *);
+		index = i * sizeof(char *); //position of the i-th argument
 		//read the old offset.
-		old_offset = ((0xFF & kargbuf[index + 3]) << 24) | ((0xFF & kargbuf[index + 2]) << 16) |
-					 ((0xFF & kargbuf[index + 1]) << 8) | (0xFF & kargbuf[index]);
+		old_offset = kargbuf[index];
 
 		//calculate the new offset
 		new_offset = stackptr + old_offset;
@@ -214,6 +210,9 @@ int sys_execv(char *program, char **args)
 	}
 
 	//adjust the stackptr to reflect the change
+	/*stackptr starts from 0x80000000,
+	 *i.e if I lower by buflen I go to the user stack
+	 */
 	stackptr -= buflen;
 	err = adjust_kargbuf(argc, stackptr);
 	if (err)
