@@ -40,8 +40,8 @@ copy_args(char **args, int *argc, int *buflen)
 	int nlast = 0;
 	unsigned char *p_begin = NULL;
 	unsigned char *p_end = NULL;
-	uint32_t offset;
-	uint32_t last_offset;
+	int offset;
+	int last_offset;
 
 	//initialize the number of arguments and the buffer size
 	*argc = 0;
