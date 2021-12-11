@@ -33,7 +33,7 @@ get_aligned_length(char *arg, int alignment)
 }
 
 static int
-copy_args(char **uargs, int *nargs, int *buflen)
+copy_args(char **args, int *nargs, int *buflen)
 {
 	int i = 0;
 	int err;
@@ -45,7 +45,7 @@ copy_args(char **uargs, int *nargs, int *buflen)
 	uint32_t last_offset;
 
 	//check whether we got a valid pointer.
-	if (uargs == NULL)
+	if (args == NULL)
 		return EFAULT;
 
 	//initialize the numbe of arguments and the buffer size
@@ -54,7 +54,7 @@ copy_args(char **uargs, int *nargs, int *buflen)
 
 	//copy-in kargs.
 	i = 0;
-	while ((err = copyin((userptr_t)uargs + i * 4, &ptr, sizeof(ptr))) == 0)
+	while ((err = copyin((userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
 	{
 		if (ptr == NULL)
 			break;
@@ -82,7 +82,7 @@ copy_args(char **uargs, int *nargs, int *buflen)
 	p_end = kargbuf + (*nargs * sizeof(char *));
 	nlast = 0;
 	last_offset = *nargs * sizeof(char *);
-	while ((err = copyin((userptr_t)uargs + i * 4, &ptr, sizeof(ptr))) == 0)
+	while ((err = copyin((userptr_t)args + i * 4, &ptr, sizeof(ptr))) == 0)
 	{
 		if (ptr == NULL)
 			break;
@@ -144,7 +144,7 @@ adjust_kargbuf(int nparams, vaddr_t stackptr)
 	return 0;
 }
 
-int sys_execv(char *upname, char **uargs)
+int sys_execv(char *program, char **args)
 {
 	struct addrspace *newas = NULL;
 	struct addrspace *oldas = NULL;
@@ -152,20 +152,21 @@ int sys_execv(char *upname, char **uargs)
 	vaddr_t entrypoint;
 	vaddr_t stackptr;
 	int err;
-	char kpname[MAX_PROG_NAME];
+	char *kprogram;
 	int nargs;
 	int buflen;
+	int len;
 
 	KASSERT(curproc != NULL);
 	/*check if arguments are valid*/
-	if (upname == NULL || uargs == NULL)
+	if (program == NULL || args == NULL)
 	{
 		return EFAULT;
 	}
 	lock_acquire(exec_lock);
 
 	//copy the arguments into the kernel buffer.
-	err = copy_args(uargs, &nargs, &buflen);
+	err = copy_args(args, &nargs, &buflen);
 	if (err)
 	{
 		lock_release(exec_lock);
@@ -173,7 +174,13 @@ int sys_execv(char *upname, char **uargs)
 		return err;
 	}
 	//copyin the program name.
-	err = copyinstr((userptr_t)upname, kpname, sizeof(kpname), NULL);
+	len = strlen(program)+1;
+	kprogram = kmalloc(len);
+	if (kprogram == NULL) {
+		lock_release(exec_lock);
+		return ENOMEM;
+	}
+	err = copyinstr((userptr_t)program, kprogram, len, NULL);
 	if (err)
 	{
 		lock_release(exec_lock);
@@ -181,7 +188,7 @@ int sys_execv(char *upname, char **uargs)
 	}
 
 	//try to open the given executable.
-	err = vfs_open(kpname, O_RDONLY, 0, &vn);
+	err = vfs_open(kprogram, O_RDONLY, 0, &vn);
 	if (err)
 	{
 		lock_release(exec_lock);
