@@ -13,6 +13,7 @@
 #include <vfs.h>
 #include <syscall.h>
 
+/*at the beginning it's '\000' repeated ARG_MAX times*/
 static char karg[ARG_MAX];			   /*argument string, it's not a string array*/
 static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
 
@@ -45,16 +46,18 @@ copy_args(char **args, int *argc, int *buflen)
 
 	//initialize the number of arguments and the buffer size
 	*argc = 0;
+	
 	*buflen = 0;
 	/*find how many arguments*/
 	for (i = 0; args[i] != NULL; i++)
 		;
 	*argc = i + 1; //count also the last NULL argument
 
+	/*initialize kernel buffer*/
 	p_begin = kargbuf;
-	p_end = kargbuf + (*argc * sizeof(char *));
-	nlast = 0;
 	last_offset = *argc * sizeof(char *);
+	p_end = p_begin + last_offset;
+	nlast = 0;
 	i = 0;
 	while (args[i] != NULL)
 	{
@@ -65,11 +68,8 @@ copy_args(char **args, int *argc, int *buflen)
 		/*now I have in karg the i-th argument*/
 		offset = last_offset + nlast;
 		nlast = padded_length(karg, 4);
-		//copy the integer into 4 bytes.
+
 		*p_begin = offset & 0xff;
-		*(p_begin + 1) = (offset >> 8) & 0xff;
-		*(p_begin + 2) = (offset >> 16) & 0xff;
-		*(p_begin + 3) = (offset >> 24) & 0xff;
 
 		//copy the string the buffer.
 		/*
