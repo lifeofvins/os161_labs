@@ -13,7 +13,7 @@
 #include <vfs.h>
 #include <syscall.h>
 
-static char karg[ARG_MAX];
+static char karg[ARG_MAX]; /*argument string, it's not a string array*/
 static unsigned char kargbuf[ARG_MAX];
 
 #define MAX_PROG_NAME 32
@@ -23,23 +23,23 @@ static unsigned char kargbuf[ARG_MAX];
  * this function will align its length (by appending zero) to match the required alignment.
  */
 static int
-align_arg(char arg[ARG_MAX], int align)
+align_arg(char *arg, int align)
 {
-	char *p = arg;
 	int len = 0;
 	int diff;
 
-	while (*p++ != '\0')
-		++len;
+	while (arg[len] != '\0')
+		len++;
 
-	if (++len % align == 0)
+	len++; /*last character*/
+	if (len % align == 0)
 		return len;
 
 	diff = align - (len % align);
 	while (diff--)
 	{
-		*(++p) = '\0';
-		++len;
+		arg[len] = '\0';
+		len++;
 	}
 
 	return len;
@@ -49,22 +49,23 @@ align_arg(char arg[ARG_MAX], int align)
  * return the nearest length aligned to alignment.
  */
 static int
-get_aligned_length(char arg[ARG_MAX], int alignment)
+get_aligned_length(char *arg, int alignment)
 {
-	char *p = arg;
 	int len = 0;
 
-	while (*p++ != '\0')
-		++len;
+	while (arg[len] != '\0')
+		len++;
 
-	if (++len % 4 == 0)
+	len++;
+
+	if (len % 4 == 0)
 		return len;
 
 	return len + (alignment - (len % alignment));
 }
 
 static int
-copy_args(char ** uargs, int *nargs, int *buflen)
+copy_args(char **uargs, int *nargs, int *buflen)
 {
 	int i = 0;
 	int err;
@@ -176,7 +177,7 @@ adjust_kargbuf(int nparams, vaddr_t stackptr)
 	return 0;
 }
 
-int sys_execv(char * upname, char ** uargs)
+int sys_execv(char *upname, char **uargs)
 {
 	struct addrspace *newas = NULL;
 	struct addrspace *oldas = NULL;
@@ -219,7 +220,7 @@ int sys_execv(char * upname, char ** uargs)
 		lock_release(exec_lock);
 		return err;
 	}
-	
+
 	//create the new addrspace.
 	newas = as_create();
 	if (newas == NULL)
