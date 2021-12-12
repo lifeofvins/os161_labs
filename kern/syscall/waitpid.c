@@ -30,7 +30,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return EFAULT;
     }
     /*null status pointer*/
-    if ((void *)statusp == NULL) {
+    if (statusp == NULL) {
         *retval = -1;
         return EINVAL;
     }
@@ -72,7 +72,12 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         *retval = -1;
         return EINVAL;
     }
-
+    //a process cannot wait for itself
+    if (p == curproc) {
+        *retval = -1;
+        return EPERM; //operation not permitted
+    }
+    
     //if the pid exists, are we allowed to wait for it? i.e, is it our child?
     if (curproc != p->p_parent)
     {
