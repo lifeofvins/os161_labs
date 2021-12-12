@@ -206,8 +206,13 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 		return -1;
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
+	if (of == NULL)
+	{
+		return EBADF;
+	}
 	vn = of->vn;
-	KASSERT(vn != NULL);
+	if (vn == NULL)
+		return EINVAL;
 
 	lock_acquire(of->file_lock);
 	iov.iov_ubase = buf_ptr;
@@ -546,61 +551,60 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
  * - 0, on success
  * - error code, otherwise
  */
-off_t
-sys_lseek(int fd, off_t offset, int whence, int *ret_val)
+off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 {
-    off_t actual_offset = 0;
-    off_t dis;
-    struct openfile *of;
-    struct stat stat;
+	off_t actual_offset = 0;
+	off_t dis;
+	struct openfile *of;
+	struct stat stat;
 
-    spinlock_acquire(&curproc->p_spinlock);
-    /* Checks whether the file descriptor is valid */
-    if (fd < 0 || fd > OPEN_MAX || !is_valid_fd(fd))
-    {
-        *ret_val = -1;
-        spinlock_release(&curproc->p_spinlock);
-        return EBADF;
-    }
+	spinlock_acquire(&curproc->p_spinlock);
+	/* Checks whether the file descriptor is valid */
+	if (fd < 0 || fd > OPEN_MAX || !is_valid_fd(fd))
+	{
+		*ret_val = -1;
+		spinlock_release(&curproc->p_spinlock);
+		return EBADF;
+	}
 
-    /* Checks whether the whence parameter is valid */
-    if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
-    {
-        *ret_val = -1;
-        spinlock_release(&curproc->p_spinlock);
-        return EINVAL;
-    }
+	/* Checks whether the whence parameter is valid */
+	if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
+	{
+		*ret_val = -1;
+		spinlock_release(&curproc->p_spinlock);
+		return EINVAL;
+	}
 
-    /* If the offset is zero, we can exit */
-    if(offset == 0)
-    {
-        *ret_val = 0;
-        spinlock_release(&curproc->p_spinlock);
-        return 0;
-    }
+	/* If the offset is zero, we can exit */
+	if (offset == 0)
+	{
+		*ret_val = 0;
+		spinlock_release(&curproc->p_spinlock);
+		return 0;
+	}
 
-    of = curproc->fileTable[fd];
-    
-    /**
+	of = curproc->fileTable[fd];
+
+	/**
      * SEEK_SET
      * The offset will simply be the one
      * passed as parameter.
      */
-    if(whence == SEEK_SET)
-    {
-        actual_offset = offset;
-    }
-    /**
+	if (whence == SEEK_SET)
+	{
+		actual_offset = offset;
+	}
+	/**
      * SEEK_CUR
      * We need to compute the displacement
      * from the current position adding the
      * offset passed as parameter.
      */
-    else if(whence == SEEK_CUR)
-    {
-        actual_offset = of->offset + offset;
-    }
-    /**
+	else if (whence == SEEK_CUR)
+	{
+		actual_offset = of->offset + offset;
+	}
+	/**
      * SEEK_END
      * In this case, we need to retrieve the
      * information about the length of the
@@ -613,17 +617,17 @@ sys_lseek(int fd, off_t offset, int whence, int *ret_val)
      * <------------------->
      * <--------file_length+offset------------>
      */
-    else if(whence == SEEK_END)
-    {
-        VOP_STAT(of->vn, &stat);
-        dis = stat.st_size;
-        actual_offset = dis + offset;
-    }
+	else if (whence == SEEK_END)
+	{
+		VOP_STAT(of->vn, &stat);
+		dis = stat.st_size;
+		actual_offset = dis + offset;
+	}
 
-    of->offset = actual_offset;
-    
-    spinlock_release(&curproc->p_spinlock);
-    return actual_offset;
+	of->offset = actual_offset;
+
+	spinlock_release(&curproc->p_spinlock);
+	return actual_offset;
 }
 
 /**
@@ -636,10 +640,9 @@ sys_lseek(int fd, off_t offset, int whence, int *ret_val)
  * - 0, if fd is not valid
  * - whatever else otherwise
  */
-int
-is_valid_fd(int fd)
+int is_valid_fd(int fd)
 {
-    if (fd < 0 || fd > OPEN_MAX)
-        return 0;
-    return !(curproc->fileTable[fd]->vn == NULL);
+	if (fd < 0 || fd > OPEN_MAX)
+		return 0;
+	return !(curproc->fileTable[fd]->vn == NULL);
 }

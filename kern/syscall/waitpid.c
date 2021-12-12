@@ -14,6 +14,7 @@
 #include <current.h>
 #include <synch.h>
 #include <kern/wait.h>
+#include <copyinout.h>
 
 int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 {
@@ -22,7 +23,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL);
-
+    int result;
     /*status pointer check invalid alignment*/
     if ((unsigned int)statusp & 0x3)
     {
@@ -30,18 +31,21 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return EFAULT;
     }
     /*null status pointer*/
-    if (statusp == NULL) {
+    if (statusp == NULL)
+    {
         *retval = -1;
         return EINVAL;
     }
     /*status must point to userland*/
-    if ((void *)statusp >= KERNEL_PTR) {
+    if ((void *)statusp >= KERNEL_PTR)
+    {
         *retval = -1;
         return EFAULT;
     }
 
     /*invalid ptr*/
-    if ((void *)statusp == INVALID_PTR) {
+    if ((void *)statusp == INVALID_PTR)
+    {
         *retval = -1;
         return EINVAL;
     }
@@ -73,11 +77,17 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return EINVAL;
     }
     //a process cannot wait for itself
-    if (p == curproc) {
+    if (p == curproc)
+    {
         *retval = -1;
         return EPERM; //operation not permitted
     }
-    
+    //a process cannot wait for its parent
+    if (p == curproc->p_parent)
+    {
+        *retval = -1;
+        return EPERM;
+    }
     //if the pid exists, are we allowed to wait for it? i.e, is it our child?
     if (curproc != p->p_parent)
     {
@@ -98,7 +108,13 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return 0;
     }
     s = proc_wait(p);
-    *(int *)statusp = s;
+
+    /*copy onto user space the return status*/
+    result = copyout(&s, statusp, sizeof(int));
+    if (result) {
+        *retval = -1;
+        return result;
+    }
 
     return pid;
 #else
