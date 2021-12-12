@@ -25,31 +25,6 @@ static unsigned char kargbuf[ARG_MAX]; /*array of bytes*/
 #define MAX_PROG_NAME 32
 
 /*
- * This function performs preliminary checks on curproc
- * and execv parameters
- */
-int validity_checks(char *program, char **args)
-{
-	//preliminar checks
-	if (curproc == NULL)
-	{
-		return ESRCH; //no such process
-	}
-	if (program == NULL || args == NULL)
-	{
-		return EFAULT;
-	}
-
-	if ((void *)program == INVALID_PTR || (void *)args == INVALID_PTR)
-	{
-		return EINVAL;
-	}
-	if ((void *)program >= KERNEL_PTR || (void *)args >= KERNEL_PTR)
-	{
-		return EINVAL;
-	}
-}
-/*
  * This function returns the required padding for user args
  */
 static int
@@ -178,9 +153,24 @@ int sys_execv(char *program, char **args)
 	int buflen;
 	int len;
 
-	err = validity_checks(program, args);
-	if (err) return err;
-	
+	//preliminar checks
+	if (curproc == NULL)
+	{
+		return ESRCH; //no such process
+	}
+	if (program == NULL || args == NULL)
+	{
+		return EFAULT;
+	}
+
+	if ((void *)program == INVALID_PTR || (void *)args == INVALID_PTR)
+	{
+		return EINVAL;
+	}
+	if ((void *)program >= KERNEL_PTR || (void *)args >= KERNEL_PTR)
+	{
+		return EINVAL;
+	}
 	lock_acquire(exec_lock);
 
 	//copy the arguments into the kernel buffer.
