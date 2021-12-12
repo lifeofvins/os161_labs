@@ -114,9 +114,6 @@ struct proc
 	struct array *p_children; /*array dei figli*/
 #endif
 };
-#if OPT_WAITPID
-struct lock *wait_lock;
-#endif
 #if OPT_EXECV
 struct lock *exec_lock; /*lock used in sys_execv: created in proc_bootstrap() function*/
 #endif

@@ -15,17 +15,6 @@
 #include <synch.h>
 #include <kern/wait.h>
 
-static int
-check_statusp(userptr_t statusp) {
-/*status pointer check invalid alignment*/
-    if ((int)statusp & 0x3) return -1;
-    /*null status pointer*/
-    if (statusp == NULL) return -1;
-    /*status must point to userland*/
-    if ((unsigned int)statusp >= MIPS_KSEG0) return -1;
-
-    return 0;
-}
 int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 {
 
@@ -34,12 +23,27 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL);
 
-    int err;
-
-    err = check_statusp(statusp);
-    if (err) {
-        *retval = err;
+    /*status pointer check invalid alignment*/
+    if ((unsigned int)statusp & 0x3)
+    {
+        *retval = -1;
         return EFAULT;
+    }
+    /*null status pointer*/
+    if ((void *)statusp == NULL) {
+        *retval = -1;
+        return EINVAL;
+    }
+    /*status must point to userland*/
+    if ((void *)statusp >= KERNEL_PTR) {
+        *retval = -1;
+        return EFAULT;
+    }
+
+    /*invalid ptr*/
+    if ((void *)statusp == INVALID_PTR) {
+        *retval = -1;
+        return EINVAL;
     }
     /*options check*/
     if (options != 0 && options != WNOHANG)
@@ -48,7 +52,8 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return EINVAL;
     }
     //invalid pid check
-    if (pid <= 0) {
+    if (pid <= 0)
+    {
         *retval = -1;
         return EINVAL;
     }
@@ -56,7 +61,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
     struct proc *p = proc_search_pid(pid, retval);
     int s;
 
-    if (p == NULL )
+    if (p == NULL)
     {
         //the pid doesn't exist
         *retval = -1;

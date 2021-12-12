@@ -364,11 +364,6 @@ void proc_bootstrap(void)
 	spinlock_init(&processTable.lk);
 	/* kernel process is not registered in the table */
 	processTable.active = 1;
-	wait_lock = lock_create("wait_lock");
-	if (wait_lock == NULL)
-	{
-		panic("Could not create wait_lock.\n");
-	}
 #if OPT_EXECV
 	exec_lock = lock_create("exec_lock");
 	if (exec_lock == NULL)
@@ -525,7 +520,6 @@ int proc_wait(struct proc *proc)
 	/* NULL and kernel proc forbidden */
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
-
 	/* wait on semaphore or condition variable */
 #if USE_SEMAPHORE_FOR_WAITPID
 	P(proc->p_sem);
