@@ -38,7 +38,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
 
     err = check_statusp(statusp);
     if (err) {
-        *retval = -1;
+        *retval = err;
         return EFAULT;
     }
     /*options check*/
