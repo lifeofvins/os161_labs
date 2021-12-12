@@ -1,3 +1,8 @@
+/*
+ * Author: Grazia D'Onghia
+ * Implementation of sys_execv
+ */
+
 #include <types.h>
 #include <lib.h>
 #include <copyinout.h>
@@ -13,14 +18,14 @@
 #include <vfs.h>
 #include <syscall.h>
 
-/*at the beginning it's '\000' repeated ARG_MAX times*/
+/*Shared data structures --> we need a lock for them (exec_lock)*/
 static char karg[ARG_MAX];			   /*argument string, it's not a string array*/
-static unsigned char kargbuf[ARG_MAX]; /*array of bytes for user stack*/
+static unsigned char kargbuf[ARG_MAX]; /*array of bytes*/
 
 #define MAX_PROG_NAME 32
 
-/**
- * return the nearest length aligned to alignment.
+/*
+ * This function returns the required padding for user args
  */
 static int
 padded_length(char *arg, int alignment)
@@ -33,6 +38,11 @@ padded_length(char *arg, int alignment)
 	return len + (alignment - (len % alignment));
 }
 
+/*
+ * This function copies the args from user space to kernel space, 
+ * building the kernel buffer, which will be then used to store args pointers
+ * for user stack
+ */
 static int
 copy_args_to_kbuf(char **args, int *argc, int *buflen)
 {
@@ -75,8 +85,9 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 		 *copies n characters from memory area src to memory area dest.
 		 */
 		memcpy(p_end, karg, padding);
-		/*convert int to 4 bytes*/
-		*p_begin = offset; /*first element*/
+
+		/*save the offset*/
+		*p_begin = offset;
 
 		p_end += padding;
 
@@ -87,15 +98,19 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 		last_offset = offset;
 
 		++i;
-		*buflen += padded_length(karg, 4) + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
+		*buflen += padding + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
 	}
 
 	*buflen += sizeof(char *);
 	return 0;
 }
 
+/*
+ * This function modifies the kargbuf content in order to store
+ * user stack position of the passed arguments
+ */
 static int
-adjust_kargbuf(int nparams, vaddr_t stackptr)
+change_kargbuf_for_userstack(int nparams, vaddr_t stackptr)
 {
 	int i;
 	int new_offset = 0;
@@ -120,9 +135,9 @@ adjust_kargbuf(int nparams, vaddr_t stackptr)
 
 int sys_execv(char *program, char **args)
 {
-	struct addrspace *newas = NULL;
-	struct addrspace *oldas = NULL;
-	struct vnode *vn = NULL;
+	struct addrspace *newas;
+	struct addrspace *oldas;
+	struct vnode *vn;
 	vaddr_t entrypoint;
 	vaddr_t stackptr;
 	int err;
@@ -131,11 +146,23 @@ int sys_execv(char *program, char **args)
 	int buflen;
 	int len;
 
-	KASSERT(curproc != NULL);
-	/*check if arguments are valid*/
+	//preliminar checks
+	if (curproc == NULL)
+	{
+		return ESRCH; //no such process
+	}
 	if (program == NULL || args == NULL)
 	{
 		return EFAULT;
+	}
+
+	if ((void *)program == INVALID_PTR || (void *)args == INVALID_PTR)
+	{
+		return EINVAL;
+	}
+	if ((void *)program >= KERNEL_PTR || (void *)args >= KERNEL_PTR)
+	{
+		return EINVAL;
 	}
 	lock_acquire(exec_lock);
 
@@ -214,7 +241,7 @@ int sys_execv(char *program, char **args)
 	 *i.e if I lower by buflen I go to the user stack
 	 */
 	stackptr -= buflen;
-	err = adjust_kargbuf(argc, stackptr);
+	err = change_kargbuf_for_userstack(argc, stackptr);
 	if (err)
 	{
 		proc_setas(oldas);

@@ -21,7 +21,7 @@
 #include <proc.h>
 
 int dir_parser(const char *);
-void user_uio_kinit(struct uio *, struct iovec *, userptr_t, size_t);
+void uspace_uio_kinit(struct uio *, struct iovec *, userptr_t, size_t);
 
 /**
  * getcwd: get the current working directory
@@ -50,15 +50,15 @@ int sys_getcwd(userptr_t buf, size_t size, int *return_value)
         This could be a useful check for whether the 
         current working director is a NULL pointer
     */
-
     struct vnode *cwd_vn = curproc->p_cwd;
     if (cwd_vn == 0x00)
     {
+        *return_value = -1;
         return ENOENT;
     }
 
     /* Setting the user space without involving the kernel level address space */
-    user_uio_kinit(&uio, &iovec, buf, size);
+    uspace_uio_kinit(&uio, &iovec, buf, size);
 
     vfs_return_value = vfs_getcwd(&uio);
     if (vfs_return_value != 0)
@@ -89,7 +89,7 @@ int sys_getcwd(userptr_t buf, size_t size, int *return_value)
  * - 0, if success
  * - -1, otherwise
  */
-int sys_chdir(userptr_t path)
+int sys_chdir(userptr_t path, int *return_value)
 {
     KASSERT(path != 0x00);
 
@@ -98,14 +98,34 @@ int sys_chdir(userptr_t path)
 
     /* Check whether the new dir path is valid or not */
     if (dir_parser((const char *)path))
+    {
+        *return_value = -1;
         return -1;
+    }
 
-    copyinstr(path, kpath, __PATH_MAX, NULL);
+    kpath = (char*) kmalloc(__PATH_MAX);
+
+    if(kpath == 0x00)
+    {
+        // bad allocation
+        *return_value = -1;
+        return -1;
+    }
+
+    if(copyinstr(path, kpath, __PATH_MAX, NULL))
+    {
+        kfree(kpath);
+        *return_value = -1;
+        return -2;
+    }
 
     vfs_return_value = vfs_chdir(kpath);
 
     if (vfs_return_value)
+    {
+        *return_value = -1;
         return vfs_return_value;
+    }
 
     return 0;
 }
@@ -156,15 +176,17 @@ int dir_parser(const char *dir)
 }
 
 /**
- * user_uio_kinit
+ * uspace_uio_kinit
  * 
  * Sets the user space without 
  * involving the kernel level
  * address space.
  */
-void user_uio_kinit(struct uio *uio, struct iovec *iovec, userptr_t buf, size_t size)
+void uspace_uio_kinit(struct uio *uio, struct iovec *iovec, userptr_t buf, size_t size)
 {
     uio_kinit(iovec, uio, buf, size, 0, UIO_READ);
+    iovec->iov_ubase = buf;
     uio->uio_segflg = UIO_USERSPACE;
     uio->uio_space = proc_getas();
 }
+

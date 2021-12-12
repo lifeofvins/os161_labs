@@ -136,7 +136,8 @@ void syscall(struct trapframe *tf)
 
 	case SYS_chdir:
 		retval = sys_chdir(
-			(userptr_t)tf->tf_a0);
+			(userptr_t)tf->tf_a0,
+			(int *)&err);
 		break;
 
 	case SYS___getcwd:
@@ -144,6 +145,8 @@ void syscall(struct trapframe *tf)
 			(userptr_t)tf->tf_a0,
 			(size_t)tf->tf_a1,
 			(int *)&err);
+		char *px = (char *)tf->tf_a0;
+		(void)px;
 		break;
 
 	case SYS_dup2:
@@ -254,4 +257,3 @@ void syscall(struct trapframe *tf)
 	/* ...or leak any spinlocks */
 	KASSERT(curthread->t_iplhigh_count == 0);
 }
-

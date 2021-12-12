@@ -37,6 +37,10 @@
 #include "opt-file.h"
 #include "opt-execv.h"
 
+/*constants for pointer check in system calls*/
+#define KERNEL_PTR ((void *)0x80000000)
+#define INVALID_PTR ((void *)0x40000000)
+
 struct trapframe; /* from <machine/trapframe.h> */
 
 /*
@@ -73,7 +77,7 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val);
 
 /*sdp project*/
 int sys_getcwd(userptr_t buf, size_t size, int *ret_val);
-int sys_chdir(userptr_t path);
+int sys_chdir(userptr_t path, int *return_value);
 int sys_dup2(int old_fd, int new_fd, int *ret_val);
 off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val);
 int is_valid_fd(int fd);
