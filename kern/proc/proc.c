@@ -58,12 +58,12 @@
 #include <synch.h>
 #include <kern/wait.h>
 
-
-static struct _processTable {
-  int active;           /* initial value 0 */
-  struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
-  int last_i;           /* index of last allocated pid */
-  struct spinlock lk;	/* Lock for this table */
+static struct _processTable
+{
+	int active;						 /* initial value 0 */
+	struct proc *proc[MAX_PROC + 1]; /* [0] not used. pids are >= 1 */
+	int last_i;						 /* index of last allocated pid */
+	struct spinlock lk;				 /* Lock for this table */
 
 } processTable;
 
@@ -78,23 +78,29 @@ struct proc *kproc;
  * Initialize support for pid/waitpid.
  */
 struct proc *
-proc_search_pid(pid_t pid, pid_t *retval) {
+proc_search_pid(pid_t pid, pid_t *retval)
+{
 #if OPT_WAITPID
-  struct proc *p;
-  if (pid < 0 || pid > MAX_PROC) {
-  	*retval = -1;
-  	return NULL;
-  }
-  p = processTable.proc[pid];
-  if (p->p_pid != pid) {
-  	//invece di KASSERT
-  	*retval = -1;
-  	return NULL;
-  }
-  return p;
+	struct proc *p;
+	if (pid < 0 || pid > MAX_PROC)
+	{
+		*retval = -1;
+		return NULL;
+	}
+	spinlock_acquire(&processTable.lk);
+	p = processTable.proc[pid];
+	if (p->p_pid != pid)
+	{
+		//invece di KASSERT
+		spinlock_release(&processTable.lk);
+		*retval = -1;
+		return NULL;
+	}
+	spinlock_release(&processTable.lk);
+	return p;
 #else
-  (void)pid;
-  return NULL;
+	(void)pid;
+	return NULL;
 #endif
 }
 
@@ -103,40 +109,46 @@ proc_search_pid(pid_t pid, pid_t *retval) {
  * Initialize support for pid/waitpid.
  */
 static void
-proc_init_waitpid(struct proc *proc, const char *name) {
+proc_init_waitpid(struct proc *proc, const char *name)
+{
 #if OPT_WAITPID
-  /* search a free index in table using a circular strategy */
-  int i;
-  spinlock_acquire(&processTable.lk);
-  i = processTable.last_i+1;
-  proc->p_pid = 0;
-  if (i>MAX_PROC) i=1;
-  while (i!=processTable.last_i) {
-    if (processTable.proc[i] == NULL) {
-      processTable.proc[i] = proc;
-      processTable.last_i = i;
-      proc->p_pid = i;
-      break;
-    }
-    i++;
-    if (i>MAX_PROC) i=1;
-  }
-  spinlock_release(&processTable.lk);
-  if (proc->p_pid==0) {
-    panic("too many processes. proc table is full\n");
-  }
-  proc->p_status = 0;
+	/* search a free index in table using a circular strategy */
+	int i;
+	spinlock_acquire(&processTable.lk);
+	i = processTable.last_i + 1;
+	proc->p_pid = 0;
+	if (i > MAX_PROC)
+		i = 1;
+	while (i != processTable.last_i)
+	{
+		if (processTable.proc[i] == NULL)
+		{
+			processTable.proc[i] = proc;
+			processTable.last_i = i;
+			proc->p_pid = i;
+			break;
+		}
+		i++;
+		if (i > MAX_PROC)
+			i = 1;
+	}
+	spinlock_release(&processTable.lk);
+	if (proc->p_pid == 0)
+	{
+		panic("too many processes. proc table is full\n");
+	}
+	proc->p_status = 0;
 
-  proc->p_lock = lock_create(name);
+	proc->p_lock = lock_create(name);
 #if USE_SEMAPHORE_FOR_WAITPID
-  proc->p_sem = sem_create(name, 0);
+	proc->p_sem = sem_create(name, 0);
 #else
-  proc->p_cv_lock = lock_create("cv_lock");
-  proc->p_cv = cv_create(name);
+	proc->p_cv_lock = lock_create("cv_lock");
+	proc->p_cv = cv_create(name);
 #endif
 #else
-  (void)proc;
-  (void)name;
+	(void)proc;
+	(void)name;
 #endif
 }
 
@@ -145,43 +157,45 @@ proc_init_waitpid(struct proc *proc, const char *name) {
  * Terminate support for pid/waitpid.
  */
 static void
-proc_end_waitpid(struct proc *proc) {
+proc_end_waitpid(struct proc *proc)
+{
 #if OPT_WAITPID
-  /* remove the process from the table */
-  int i;
-  spinlock_acquire(&processTable.lk);
-  i = proc->p_pid;
-  KASSERT(i>0 && i<=MAX_PROC);
-  processTable.proc[i] = NULL;
-  spinlock_release(&processTable.lk);
+	/* remove the process from the table */
+	int i;
+	spinlock_acquire(&processTable.lk);
+	i = proc->p_pid;
+	KASSERT(i > 0 && i <= MAX_PROC);
+	processTable.proc[i] = NULL;
+	spinlock_release(&processTable.lk);
 
 #if USE_SEMAPHORE_FOR_WAITPID
-  sem_destroy(proc->p_sem);
+	sem_destroy(proc->p_sem);
 #else
-  lock_destroy(proc->p_cv_lock);
-  cv_destroy(proc->p_cv);
+	lock_destroy(proc->p_cv_lock);
+	cv_destroy(proc->p_cv);
 #endif
-  lock_destroy(proc->p_lock); 
+	lock_destroy(proc->p_lock);
 #else
-  (void)proc;
+	(void)proc;
 #endif
 }
 
 /*
  * Create a proc structure.
  */
-static
-struct proc *
+static struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
 
 	proc = kmalloc(sizeof(*proc));
-	if (proc == NULL) {
+	if (proc == NULL)
+	{
 		return NULL;
 	}
 	proc->p_name = kstrdup(name);
-	if (proc->p_name == NULL) {
+	if (proc->p_name == NULL)
+	{
 		kfree(proc);
 		return NULL;
 	}
@@ -195,16 +209,16 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
-	proc_init_waitpid(proc,name); //in questa funzione viene aggiunto alla tabella dei proccessi
-	
+	proc_init_waitpid(proc, name); //in questa funzione viene aggiunto alla tabella dei proccessi
+
 	proc->p_exited = false;
 
 #if OPT_FILE
 	/*create per process fileTable*/
 	/*cabodi*/
-	
-	bzero(proc->fileTable, OPEN_MAX*sizeof(struct openfile *));
-	
+
+	bzero(proc->fileTable, OPEN_MAX * sizeof(struct openfile *));
+
 #endif
 
 #if OPT_FORK
@@ -221,8 +235,7 @@ proc_create(const char *name)
  * Note: nothing currently calls this. Your wait/exit code will
  * probably want to do so.
  */
-void
-proc_destroy(struct proc *proc)
+void proc_destroy(struct proc *proc)
 {
 	/*
 	 * You probably want to destroy and null out much of the
@@ -242,13 +255,15 @@ proc_destroy(struct proc *proc)
 	 */
 
 	/* VFS fields */
-	if (proc->p_cwd) {
+	if (proc->p_cwd)
+	{
 		VOP_DECREF(proc->p_cwd);
 		proc->p_cwd = NULL;
 	}
 
 	/* VM fields */
-	if (proc->p_addrspace) {
+	if (proc->p_addrspace)
+	{
 		/*
 		 * If p is the current process, remove it safely from
 		 * p_addrspace before destroying it. This makes sure
@@ -284,11 +299,13 @@ proc_destroy(struct proc *proc)
 		 */
 		struct addrspace *as;
 
-		if (proc == curproc) {
+		if (proc == curproc)
+		{
 			as = proc_setas(NULL);
 			as_deactivate();
 		}
-		else {
+		else
+		{
 			as = proc->p_addrspace;
 			proc->p_addrspace = NULL;
 		}
@@ -301,29 +318,31 @@ proc_destroy(struct proc *proc)
 	spinlock_cleanup(&proc->p_spinlock);
 
 	kfree(proc->p_name);
-	
+
 #if OPT_FORK
-	unsigned	 i; /*indice del for per svuotare l'array di figli*/
+	unsigned i;			   /*indice del for per svuotare l'array di figli*/
 	volatile unsigned dim; /*salvo la dimensione dell'array dei figli*/
 	volatile struct proc *arr_debug;
 	if (proc->p_parent != NULL)
 		proc->p_parent = NULL;
-	
+
 	/*rimuovo anche tutti i figli del processo, se ce li ha*/
-	if (proc->p_children->num > 0) {
+	if (proc->p_children->num > 0)
+	{
 		/*ha dei figli*/
 		dim = proc->p_children->num;
-		for (i = 0; i < dim; i++) {
+		for (i = 0; i < dim; i++)
+		{
 			arr_debug = (struct proc *)array_get(proc->p_children, 0);
 			KASSERT(arr_debug != NULL);
 			array_remove(proc->p_children, 0);
 		}
 	}
-	
+
 	/*se il processo non ha figli ha già l'array dei figli vuoto*/
-	
+
 	array_destroy(proc->p_children); /*l'array deve essere vuoto*/
-	
+
 	/*metto a NULL*/
 	proc->p_children = NULL;
 	KASSERT(proc->p_children == NULL);
@@ -334,24 +353,31 @@ proc_destroy(struct proc *proc)
 /*
  * Create the process structure for the kernel.
  */
-void
-proc_bootstrap(void)
+void proc_bootstrap(void)
 {
 	kproc = proc_create("[kernel]");
-	if (kproc == NULL) {
+	if (kproc == NULL)
+	{
 		panic("proc_create for kproc failed\n");
 	}
 #if OPT_WAITPID
 	spinlock_init(&processTable.lk);
 	/* kernel process is not registered in the table */
 	processTable.active = 1;
+	wait_lock = lock_create("wait_lock");
+	if (wait_lock == NULL)
+	{
+		panic("Could not create wait_lock.\n");
+	}
+#if OPT_EXECV
 	exec_lock = lock_create("exec_lock");
-	if (exec_lock == NULL) {
+	if (exec_lock == NULL)
+	{
 		panic("Could not create exec_lock.\n");
 	}
 #endif
+#endif
 }
-
 
 /*
  * Create a fresh proc for use by runprogram.
@@ -365,7 +391,8 @@ proc_create_runprogram(const char *name)
 	struct proc *newproc;
 
 	newproc = proc_create(name); /*alloca la struttura dati del nuovo processo*/
-	if (newproc == NULL) {
+	if (newproc == NULL)
+	{
 		return NULL;
 	}
 
@@ -381,7 +408,8 @@ proc_create_runprogram(const char *name)
 	 * the only reference to it.)
 	 */
 	spinlock_acquire(&curproc->p_spinlock);
-	if (curproc->p_cwd != NULL) {
+	if (curproc->p_cwd != NULL)
+	{
 		VOP_INCREF(curproc->p_cwd);
 		newproc->p_cwd = curproc->p_cwd;
 	}
@@ -399,8 +427,7 @@ proc_create_runprogram(const char *name)
  * the timer interrupt context switch, and any other implicit uses
  * of "curproc".
  */
-int
-proc_addthread(struct proc *proc, struct thread *t)
+int proc_addthread(struct proc *proc, struct thread *t)
 {
 	int spl;
 
@@ -426,8 +453,7 @@ proc_addthread(struct proc *proc, struct thread *t)
  * the timer interrupt context switch, and any other implicit uses
  * of "curproc".
  */
-void
-proc_remthread(struct thread *t)
+void proc_remthread(struct thread *t)
 {
 	struct proc *proc;
 	int spl;
@@ -459,7 +485,8 @@ proc_getas(void)
 	struct addrspace *as;
 	struct proc *proc = curproc;
 
-	if (proc == NULL) {
+	if (proc == NULL)
+	{
 		return NULL;
 	}
 
@@ -488,52 +515,49 @@ proc_setas(struct addrspace *newas)
 	return oldas;
 }
 
-
-
-        /* G.Cabodi - 2019 - support for waitpid */
+/* G.Cabodi - 2019 - support for waitpid */
 
 /***********************************PROC_WAIT**************************************************/
-int 
-proc_wait(struct proc *proc)
+int proc_wait(struct proc *proc)
 {
 #if OPT_WAITPID
-        int return_status;
-        /* NULL and kernel proc forbidden */
+	int return_status;
+	/* NULL and kernel proc forbidden */
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
 
-        /* wait on semaphore or condition variable */ 
+	/* wait on semaphore or condition variable */
 #if USE_SEMAPHORE_FOR_WAITPID
-        P(proc->p_sem);
+	P(proc->p_sem);
 #else
-		lock_acquire(proc->p_cv_lock);
-		/*condition on which the parent proc has to wait*/
-		while(!proc->p_exited) {
-        	cv_wait(proc->p_cv, proc->p_cv_lock);
-		}
-        lock_release(proc->p_cv_lock);
+	lock_acquire(proc->p_cv_lock);
+	/*condition on which the parent proc has to wait*/
+	while (!proc->p_exited)
+	{
+		cv_wait(proc->p_cv, proc->p_cv_lock);
+	}
+	lock_release(proc->p_cv_lock);
 #endif
 	//at this point the child should be dead
 	KASSERT(proc->p_exited);
-	
+
 	//copy its exit code to the userland
-	
-        return_status = _MKWAIT_EXIT(proc->p_status);
-        
-        //unlock and destroy
-        proc_destroy(proc);
-        return return_status;
+
+	return_status = _MKWAIT_EXIT(proc->p_status);
+
+	//unlock and destroy
+	proc_destroy(proc);
+	return return_status;
 #else
-        /* this doesn't synchronize */ 
-        (void)proc;
-        return 0;
+	/* this doesn't synchronize */
+	(void)proc;
+	return 0;
 #endif
 }
 
-
 /*cabodi*/
-void 
-proc_signal_end(struct proc *proc) {
+void proc_signal_end(struct proc *proc)
+{
 
 #if USE_SEMAPHORE_FOR_WAITPID
 	V(proc->p_sem);
@@ -541,32 +565,34 @@ proc_signal_end(struct proc *proc) {
 	lock_acquire(proc->p_cv_lock);
 	cv_signal(proc->p_cv, proc->p_lock);
 	lock_release(proc->p_cv_lock);
-#endif 
+#endif
 }
 
 /*cabodi lab 05*/
 
 #if OPT_FILE
-void 
-proc_file_table_copy(struct proc *psrc, struct proc *pdest) {
-  int fd;
-  for (fd=0; fd<OPEN_MAX; fd++) {
-    struct openfile *of = psrc->fileTable[fd];
-    pdest->fileTable[fd] = of;
-    if (of != NULL) {
-      openfileIncrRefCount(of); //increment reference count
-    }
-  }
+void proc_file_table_copy(struct proc *psrc, struct proc *pdest)
+{
+	int fd;
+	for (fd = 0; fd < OPEN_MAX; fd++)
+	{
+		struct openfile *of = psrc->fileTable[fd];
+		pdest->fileTable[fd] = of;
+		if (of != NULL)
+		{
+			openfileIncrRefCount(of); //increment reference count
+		}
+	}
 }
 
 #endif
 
-
-
 #if OPT_EXECV
-struct addrspace * curproc_getas(void) {
+struct addrspace *curproc_getas(void)
+{
 	struct addrspace *as;
-	if (curproc == NULL) {
+	if (curproc == NULL)
+	{
 		return NULL;
 	}
 
@@ -576,9 +602,10 @@ struct addrspace * curproc_getas(void) {
 	return as;
 }
 
-struct addrspace * curproc_setas(struct addrspace * newas) {
-	struct addrspace * oldas;
-	struct proc * proc = curproc;
+struct addrspace *curproc_setas(struct addrspace *newas)
+{
+	struct addrspace *oldas;
+	struct proc *proc = curproc;
 
 	spinlock_acquire(&proc->p_spinlock);
 	oldas = proc->p_addrspace;

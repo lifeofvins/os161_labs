@@ -73,31 +73,32 @@ struct vnode;
 #endif
 
 #define MAX_PROC 100
-struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_spinlock;		/* Lock for this structure */
+struct proc
+{
+	char *p_name;				/* Name of this process */
+	struct spinlock p_spinlock; /* Lock for this structure */
 	unsigned p_numthreads;		/* Number of threads in this process */
 
 	/* VM */
-	struct addrspace *p_addrspace;	/* virtual address space */
+	struct addrspace *p_addrspace; /* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
+	struct vnode *p_cwd; /* current working directory */
 
 	/* add more material here as needed */
 #if OPT_WAITPID
-        /* G.Cabodi - 2019 - implement waitpid: synchro, and exit status */
-        int p_status;                   /* status as obtained by exit() */
-        pid_t p_pid;                    /* process pid */
-        
-        /*sdp project: sys__exit improvement*/
-        bool p_exited; /*is the process exited?*/
-        struct lock *p_lock;
+	/* G.Cabodi - 2019 - implement waitpid: synchro, and exit status */
+	int p_status; /* status as obtained by exit() */
+	pid_t p_pid;  /* process pid */
+
+	/*sdp project: sys__exit improvement*/
+	bool p_exited; /*is the process exited?*/
+	struct lock *p_lock;
 #if USE_SEMAPHORE_FOR_WAITPID
 	struct semaphore *p_sem;
 #else
-        struct cv *p_cv;
-        struct lock *p_cv_lock;
+	struct cv *p_cv;
+	struct lock *p_cv_lock;
 #endif
 #endif
 
@@ -109,13 +110,16 @@ struct proc {
 
 /*non funziona se metto #if oPT_FORK*/
 #if OPT_FORK
-	struct proc *p_parent; /*puntatore al padre*/
+	struct proc *p_parent;	  /*puntatore al padre*/
 	struct array *p_children; /*array dei figli*/
 #endif
 };
-
+#if OPT_WAITPID
+struct lock *wait_lock;
+#endif
+#if OPT_EXECV
 struct lock *exec_lock; /*lock used in sys_execv: created in proc_bootstrap() function*/
-
+#endif
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
 
@@ -152,13 +156,11 @@ void proc_signal_end(struct proc *proc);
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
 
-
-
 //#if OPT_EXECV
 struct addrspace *curproc_getas(void);
 struct addrspace *curproc_setas(struct addrspace *newas);
 //#endif
 
-#define PROC_LOCK(x) (lock_acquire( (x) -> p_lock))
-#define PROC_UNLOCK(x) (lock_release( (x) -> p_lock))
+#define PROC_LOCK(x) (lock_acquire((x)->p_lock))
+#define PROC_UNLOCK(x) (lock_release((x)->p_lock))
 #endif /* _PROC_H_ */

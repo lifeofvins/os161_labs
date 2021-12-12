@@ -49,7 +49,7 @@ void sys__exit(int status)
     PROC_LOCK(p);
     p->p_status = status & 0xff; /* just lower 8 bits returned */
 
-    // proc_remthread(curthread);
+    proc_remthread(curthread);
 #if USE_SEMAPHORE_FOR_WAITPID
     p->p_exited = true;
     V(p->p_sem);
