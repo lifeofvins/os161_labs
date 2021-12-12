@@ -88,12 +88,14 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	int new_pid = 0;
 	struct proc *parent = curproc;
 	struct thread *thread = curthread;
-	KASSERT(curproc != NULL);
+	
 	KASSERT(thread != NULL);
-
+	if (curproc == NULL) {
+		return ESRCH; //no such process
+	}
 	if (curproc->p_pid + 1 > MAX_PROC) {
 		*retval = -1;
-		return ENPROC; //too many processes on the system
+		return ENPROC; //too many processes in the system
 	}
 
 	/*creation of child proc struct*/
@@ -132,11 +134,9 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
     /*child points to parent*/
 	child->p_parent = parent;
 
-    /*add to child array*/ 
 	proc_add_child(parent, child);
 
-    /*file table copied inside thread_fork*/
-	
+    /*file table copied inside thread_fork in mutual exclusion*/
 	result = thread_fork(
 		curthread->t_name, child,
 		(void*)call_enter_forked_process,
