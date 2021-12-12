@@ -90,9 +90,7 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	struct thread *thread = curthread;
 	
 	KASSERT(thread != NULL);
-	if (curproc == NULL) {
-		return ESRCH; //no such process
-	}
+	KASSERT(parent != NULL);
 	if (curproc->p_pid + 1 > MAX_PROC) {
 		*retval = -1;
 		return ENPROC; //too many processes in the system

@@ -154,10 +154,7 @@ int sys_execv(char *program, char **args)
 	int len;
 
 	//preliminar checks
-	if (curproc == NULL)
-	{
-		return ESRCH; //no such process
-	}
+	KASSERT(curproc != NULL);
 	if (program == NULL || args == NULL)
 	{
 		return EFAULT;

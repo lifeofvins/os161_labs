@@ -89,10 +89,10 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval);
 pid_t sys_getpid(void);
 #if OPT_FORK
 int sys_fork(struct trapframe *ctf, pid_t *retval);
-#endif /*OPT_FORK*/
+#endif 
 #if OPT_EXECV
 int sys_execv(char * upname, char ** uargs);
-#endif /*OPT_EXECV*/
-#endif /*OPT_SYSCALLS*/
+#endif 
+#endif 
 
 #endif /* _SYSCALL_H_ */
