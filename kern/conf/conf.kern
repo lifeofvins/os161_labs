@@ -450,7 +450,7 @@ optfile lab1 main/lab1.c
 #DEFINISCO OPZIONI PER SYSCALLS LAB2 OS161
 defoption syscalls
 optfile syscalls syscall/file_syscalls.c
-optfile syscalls syscall/proc_syscalls.c
+optfile syscalls syscall/exit.c
  
  
 #DEFINISCO OPZIONI PER SYNCH LAB3 OS161
@@ -460,8 +460,9 @@ optfile synch thread/synch.c
 #DEFINISCO OPZIONI PER LAB4 (PROC_WAIT)
 defoption waitpid
 defoption fork
-optfile waitpid syscall/proc_syscalls.c
-optfile fork syscall/proc_syscalls.c
+optfile waitpid syscall/waitpid.c
+optfile waitpid syscall/getpid.c
+optfile fork syscall/fork.c
 
 
 #DEFINISCO OPZIONI PER LAB5 (FILE)
@@ -471,4 +472,4 @@ optfile file syscall/curdir_syscalls.c
 
 #PROGETTO (fork già definita prima)
 defoption execv
-optfile execv syscall/proc_syscalls.c
+optfile execv syscall/execv.c
