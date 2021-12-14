@@ -29,7 +29,7 @@
 /*max num of system wide open file*/
 #define SYSTEM_OPEN_MAX 10 * OPEN_MAX
 
-#define USE_KERNEL_BUFFER 0 //cabodi
+#define USE_KERNEL_BUFFER 1 //cabodi
 
 struct openfile
 {
@@ -296,7 +296,7 @@ return the file descriptor of the openfile item
 		{
 			of = &systemFileTable[i];
 			of->vn = v;
-			of->offset = 0; /*initialize offset. TODO: handle offset with append*/
+			of->offset = 0; 
 			of->accmode = accmode;
 			of->file_lock = lock_create(fname);
 			of->ref_count = 1;

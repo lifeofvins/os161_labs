@@ -37,7 +37,7 @@ void uspace_uio_kinit(struct uio *, struct iovec *, userptr_t, size_t);
  * - 0: success
  * - error_code: failure
  */
-int sys_getcwd(userptr_t buf, size_t size, int *return_value)
+int sys___getcwd(userptr_t buf, size_t size, int *return_value)
 {
     KASSERT(buf != 0x00);
     KASSERT(size > 0);
@@ -74,9 +74,9 @@ int sys_getcwd(userptr_t buf, size_t size, int *return_value)
      * size - uio.uio_resid is equal to the
      * amount of read data.
      */
-    *return_value = 0;
+    *return_value = size - uio.uio_resid;
 
-    return size - uio.uio_resid;
+    return 0;
 }
 
 /**
@@ -99,7 +99,7 @@ int sys_chdir(userptr_t path, int *return_value)
     /* Check whether the new dir path is valid or not */
     if (dir_parser((const char *)path))
     {
-        *return_value = -1;
+        *return_value = ENOTDIR;
         return -1;
     }
 
@@ -108,22 +108,22 @@ int sys_chdir(userptr_t path, int *return_value)
     if(kpath == 0x00)
     {
         // bad allocation
-        *return_value = -1;
+        *return_value = EFAULT;
         return -1;
     }
 
     if(copyinstr(path, kpath, __PATH_MAX, NULL))
     {
         kfree(kpath);
-        *return_value = -1;
-        return -2;
+        *return_value = EFAULT;
+        return -1;
     }
 
     vfs_return_value = vfs_chdir(kpath);
 
     if (vfs_return_value)
     {
-        *return_value = -1;
+        *return_value = ENOTDIR;
         return vfs_return_value;
     }
 
@@ -189,4 +189,3 @@ void uspace_uio_kinit(struct uio *uio, struct iovec *iovec, userptr_t buf, size_
     uio->uio_segflg = UIO_USERSPACE;
     uio->uio_space = proc_getas();
 }
-
