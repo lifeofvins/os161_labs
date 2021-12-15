@@ -146,8 +146,6 @@ int proc_wait(struct proc *proc);
 /* get proc from pid */
 struct proc *proc_search_pid(pid_t pid, pid_t *retval);
 
-/* signal end/exit of process */
-void proc_signal_end(struct proc *proc);
 /*cabodi*/
 #if OPT_FILE
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);

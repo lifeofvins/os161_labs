@@ -116,7 +116,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
         return result;
     }
 
-    return pid;
+    return p->p_pid;
 #else
     (void)options; /* not handled */
     (void)pid;

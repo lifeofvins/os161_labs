@@ -1,6 +1,7 @@
 /*
  * Author: Grazia D'Onghia
- * Implementation of sys__exit.
+ * Implementation of sys__exit, following the same logic
+ * as OS161 lab 4.
  */
 
 #include <types.h>
@@ -37,16 +38,13 @@ void sys__exit(int status)
 {
 #if OPT_WAITPID
     struct proc *p = curproc;
-    struct proc *childp = NULL;
     int err;
-    KASSERT(childp == NULL);
 
     //close all open files
     err = close_all_files(p);
     if (err) {
         panic("Problem closing open file of curproc.\n");
     }
-    PROC_LOCK(p);
     p->p_status = status & 0xff; /* just lower 8 bits returned */
 
     proc_remthread(curthread);
@@ -64,7 +62,6 @@ void sys__exit(int status)
     struct addrspace *as = proc_getas();
     as_destroy(as);
 #endif /*OPT_WAITPID*/
-    PROC_UNLOCK(p);
     thread_exit();
 
     panic("thread_exit returned (should not happen)\n");

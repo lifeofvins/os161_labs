@@ -549,19 +549,6 @@ int proc_wait(struct proc *proc)
 #endif
 }
 
-/*cabodi*/
-void proc_signal_end(struct proc *proc)
-{
-
-#if USE_SEMAPHORE_FOR_WAITPID
-	V(proc->p_sem);
-#else
-	lock_acquire(proc->p_cv_lock);
-	cv_signal(proc->p_cv, proc->p_lock);
-	lock_release(proc->p_cv_lock);
-#endif
-}
-
 /*cabodi lab 05*/
 
 #if OPT_FILE
