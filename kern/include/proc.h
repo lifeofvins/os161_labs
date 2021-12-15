@@ -151,11 +151,4 @@ struct proc *proc_search_pid(pid_t pid, pid_t *retval);
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
 #endif
 
-//#if OPT_EXECV
-struct addrspace *curproc_getas(void);
-struct addrspace *curproc_setas(struct addrspace *newas);
-//#endif
-
-#define PROC_LOCK(x) (lock_acquire((x)->p_lock))
-#define PROC_UNLOCK(x) (lock_release((x)->p_lock))
 #endif /* _PROC_H_ */

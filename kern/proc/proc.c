@@ -568,31 +568,4 @@ void proc_file_table_copy(struct proc *psrc, struct proc *pdest)
 
 #endif
 
-#if OPT_EXECV
-struct addrspace *curproc_getas(void)
-{
-	struct addrspace *as;
-	if (curproc == NULL)
-	{
-		return NULL;
-	}
 
-	spinlock_acquire(&curproc->p_spinlock);
-	as = curproc->p_addrspace;
-	spinlock_release(&curproc->p_spinlock);
-	return as;
-}
-
-struct addrspace *curproc_setas(struct addrspace *newas)
-{
-	struct addrspace *oldas;
-	struct proc *proc = curproc;
-
-	spinlock_acquire(&proc->p_spinlock);
-	oldas = proc->p_addrspace;
-	proc->p_addrspace = newas;
-	spinlock_release(&proc->p_spinlock);
-	return oldas;
-}
-
-#endif
