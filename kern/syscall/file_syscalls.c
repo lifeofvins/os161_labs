@@ -426,7 +426,7 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size)
 #endif
 	}
 
-	return 1;
+	return size;
 }
 int sys_read(int fd, userptr_t buf_ptr, size_t size)
 {
