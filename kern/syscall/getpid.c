@@ -18,9 +18,8 @@ pid_t sys_getpid(void)
 	pid_t pid;
 #if OPT_WAITPID
 	KASSERT(curproc != NULL);
-	PROC_LOCK(curproc);
 	pid = curproc->p_pid;
-	PROC_UNLOCK(curproc);
+
 	return pid;
 #else
 	return -1;
