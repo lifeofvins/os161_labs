@@ -44,7 +44,7 @@ padded_length(char *arg, int alignment)
  * for user stack
  */
 static int
-copy_args_to_kbuf(char **args, int *argc, int *buflen)
+copy_args_to_kbuf(char **args, int argc, int *buflen)
 {
 	int i;
 	int err;
@@ -54,18 +54,11 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 	volatile int offset; //volatile so it isn't optimized out during debug
 	int last_offset;
 
-	//initialize the number of arguments and the buffer size
-	*argc = 0;
-
 	*buflen = 0;
-	/*find how many arguments*/
-	for (i = 0; args[i] != NULL; i++)
-		;
-	*argc = i + 1; //count also the last NULL argument
 
 	/*initialize kernel buffer*/
 	p_begin = kargbuf; /*they both point to the same memory region*/
-	last_offset = *argc * sizeof(char *);
+	last_offset = argc * sizeof(char *);
 	p_end = p_begin + last_offset;
 	padding = 0;
 	i = 0;
@@ -92,7 +85,7 @@ copy_args_to_kbuf(char **args, int *argc, int *buflen)
 		p_end += padding;
 
 		//advance p_begin by 4 bytes --> go to next argument for next iteration.
-		p_begin += 4;
+		p_begin += sizeof(char *);
 
 		//adjust last offset
 		last_offset = offset;
@@ -151,7 +144,7 @@ int sys_execv(char *program, char **args)
 	char *kprogram;
 	int argc;
 	int buflen;
-	int len;
+	int len, i;
 
 	//preliminar checks
 	KASSERT(curproc != NULL);
@@ -170,8 +163,13 @@ int sys_execv(char *program, char **args)
 	}
 	lock_acquire(exec_lock);
 
+	/*find how many arguments*/
+	for (i = 0; args[i] != NULL; i++)
+		;
+	argc = i + 1; //count also the last NULL argument
+
 	//copy the arguments into the kernel buffer.
-	err = copy_args_to_kbuf(args, &argc, &buflen);
+	err = copy_args_to_kbuf(args, argc, &buflen);
 	if (err)
 	{
 		lock_release(exec_lock);
