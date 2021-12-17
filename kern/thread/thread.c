@@ -514,8 +514,6 @@ thread_fork(const char *name,
 	struct thread *newthread;
 	int result;
 	
-	struct proc *parent = curproc; /*per debug*/
-	//KASSERT (proc != NULL);
 	newthread = thread_create(name); /*creates the data structure*/
 	if (newthread == NULL) {
 		return ENOMEM;
@@ -556,9 +554,9 @@ thread_fork(const char *name,
 
 #if OPT_FORK
 	/*Copy parent's fileTable in mutual exclusion*/
-	lock_acquire(parent->p_lock); /*buh lo faccio in mutua esclusione*/
-	proc_file_table_copy(parent, proc);
-	lock_release(parent->p_lock);
+	lock_acquire(curproc->p_lock);
+	proc_file_table_copy(curproc, proc);
+	lock_release(curproc->p_lock);
 #endif
 	/* Lock the current cpu's run queue and make the new thread runnable */
 	thread_make_runnable(newthread, false);

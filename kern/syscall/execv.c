@@ -277,6 +277,6 @@ int sys_execv(char *program, char **args)
 
 	enter_new_process(argc - 1, (userptr_t)stackptr, NULL, stackptr, entrypoint);
 
-	panic("execv: we should not be here.");
+	panic("execv: enter_new_process should not return.");
 	return EINVAL;
 }
