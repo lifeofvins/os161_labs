@@ -70,8 +70,8 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
 struct openfile;
 void openfileIncrRefCount(struct openfile *of);
-int sys_open(userptr_t path, int openflags, mode_t mode, int *retval);
-int sys_close(int fd, int *retval);
+int sys_open(userptr_t path, int openflags, mode_t mode, int *err);
+int sys_close(int fd, int *err);
 int sys_dup2(int old_fd, int new_fd, int *ret_val);
 
 /*sdp project*/
@@ -81,15 +81,15 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val);
 off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val);
 int is_valid_fd(int fd);
 
-int sys_write(int fd, userptr_t buf_ptr, size_t size, int *retval);
-int sys_read(int fd, userptr_t buf_ptr, size_t size, int *retval);
+int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err);
+int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err);
 void sys__exit(int status);
-int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval);
+int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err);
 pid_t sys_getpid(void);
 
 int sys_fork(struct trapframe *ctf, pid_t *retval);
 
-int sys_execv(char * upname, char ** uargs);
+int sys_execv(char *program, char ** args);
 
 
 #endif /* _SYSCALL_H_ */
