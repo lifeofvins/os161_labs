@@ -117,15 +117,14 @@ void syscall(struct trapframe *tf)
 		break;
 
 		/* Add stuff here */
-#if OPT_SYSCALLS
-#if OPT_FILE
+
 	case SYS_open:
 		retval = sys_open((userptr_t)tf->tf_a0,
 						  (int)tf->tf_a1,
 						  (mode_t)tf->tf_a2, &err);
 		break;
 	case SYS_close:
-		retval = sys_close((int)tf->tf_a0);
+		retval = sys_close((int)tf->tf_a0, &err);
 		if (retval < 0)
 			err = ENOENT;
 		break;
@@ -167,11 +166,11 @@ void syscall(struct trapframe *tf)
 				(int *)&err);
 		}
 		break;
-#endif
+
 	case SYS_write:
 		retval = sys_write((int)tf->tf_a0,
 						   (userptr_t)tf->tf_a1,
-						   (size_t)tf->tf_a2);
+						   (size_t)tf->tf_a2, &err);
 		/* error: function not implemented */
 		if (retval < 0)
 			err = ENOSYS;
@@ -181,14 +180,14 @@ void syscall(struct trapframe *tf)
 	case SYS_read:
 		retval = sys_read((int)tf->tf_a0,
 						  (userptr_t)tf->tf_a1,
-						  (size_t)tf->tf_a2);
+						  (size_t)tf->tf_a2, &err);
 		if (retval < 0)
 			err = ENOSYS;
 		else
 			err = 0;
 		break;
 	case SYS__exit:
-		/* TODO: just avoid crash */
+
 		sys__exit((int)tf->tf_a0);
 		break;
 	case SYS_waitpid:
@@ -205,7 +204,6 @@ void syscall(struct trapframe *tf)
 			err = 0;
 		break;
 
-#if OPT_FORK
 	case SYS_fork:
 		retval = sys_fork(tf, &err);
 		if (retval >= 0) {
@@ -213,14 +211,11 @@ void syscall(struct trapframe *tf)
 			err = 0;
 		}
 		break;
-#endif /*OPT_FORK*/
 
-#if OPT_EXECV
 	case SYS_execv:
 		err = sys_execv((char *)tf->tf_a0, (char **)tf->tf_a1);
 		break;
-#endif
-#endif /*OPT_SYSCALLS*/
+
 
 	default:
 		kprintf("Unknown syscall %d\n", callno);

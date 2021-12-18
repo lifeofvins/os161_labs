@@ -33,10 +33,10 @@ struct openfile
 {
 	struct vnode *vn; /*pointer to vnode*/
 	mode_t mode;	  /*read-only, write-only, read-write*/
-	off_t offset;	  /*ad ogni openfile corrisponderà un offset, cioè dove stanno leggendo e scrivendo dentro al file: l'offset avanza man mano che si legge o scrive nel file*/
+	off_t offset;
 	int accmode;
 	struct lock *file_lock;
-	unsigned int ref_count; /*una openfile potrebbe essere condivisa*/
+	unsigned int ref_count; /*openfile could be shared*/
 };
 
 struct openfile systemFileTable[SYSTEM_OPEN_MAX];
@@ -50,7 +50,7 @@ void openfileIncrRefCount(struct openfile *of)
 #if USE_KERNEL_BUFFER
 /*per effettuare una read si deve predisporre opportunamente un puntatore a struct uio ku
 (che descrive il tipo di i/o da effettuare) e il puntatore al FCB*/
-static int file_read(int fd, userptr_t buf_ptr, size_t size)
+static int file_read(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	struct iovec iov;
 	struct uio ku;
@@ -59,20 +59,30 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 	struct openfile *of;
 	void *kbuf; /*kernel buffer*/
 
-	if (fd < 0 || fd > OPEN_MAX)
-		return EBADF;
+	if (!is_valid_fd(fd))
+	{
+		*retval = EBADF;
+		return -1;
+	}
 	of = curproc->fileTable[fd];
 	if (of == NULL)
-		return EBADF;
+	{
+		*retval = EBADF;
+		return -1;
+	}
 	vn = of->vn;
 	if (vn == NULL)
-		return EINVAL;
+	{
+		*retval = EINVAL;
+		return -1;
+	}
 	lock_acquire(of->file_lock);
 
 	if (of->accmode == O_WRONLY)
 	{
 		lock_release(of->file_lock);
-		return EBADF;
+		*retval = EBADF;
+		 return -1;
 	}
 	/*allocation of kernel buffer*/
 	kbuf = kmalloc(size);
@@ -82,7 +92,8 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 	if (ku.uio_segflg != UIO_SYSSPACE)
 	{
 		lock_release(of->file_lock);
-		return EINVAL;
+		*retval = EINVAL;
+		return -1;
 	}
 	result = VOP_READ(vn, &ku);
 	if (result)
@@ -97,10 +108,11 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 	kfree(kbuf);
 
 	lock_release(of->file_lock);
+
 	return nread;
 }
 
-static int file_write(int fd, userptr_t buf_ptr, size_t size)
+static int file_write(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	struct iovec iov;
 	struct uio ku;
@@ -112,23 +124,30 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 	struct proc *cur = curproc;
 	KASSERT(cur != NULL);
 
-	if (fd < 0 || fd > OPEN_MAX)
-		return EBADF;
+	if (!is_valid_fd(fd))
+	{
+		*retval = EBADF;
+		return -1;
+	}
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
 	if (of == NULL)
 	{
-		return EBADF;
+		*retval = EBADF;
+		return -1;
 	}
 	vn = of->vn;
 	if (vn == NULL)
-		return EINVAL;
-
+	{
+		*retval = EINVAL;
+		return -1;
+	}
 	lock_acquire(of->file_lock);
 	if (of->accmode == O_RDONLY)
 	{
 		lock_release(of->file_lock);
-		return EBADF;
+		*retval = EBADF;
+		return -1;
 	}
 	kbuf = kmalloc(size);
 	/*siccome devo fare la write metto prima i dati nel buffer e poi scrivo*/
@@ -137,7 +156,8 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 	if (ku.uio_segflg != UIO_SYSSPACE)
 	{
 		lock_release(of->file_lock);
-		return EINVAL; /* ? */
+		*retval = EINVAL;
+		return -1; /* ? */
 	}
 	result = VOP_WRITE(vn, &ku);
 	if (result)
@@ -155,21 +175,32 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 }
 
 #else /*no kernel buffer*/
-static int file_read(int fd, userptr_t buf_ptr, size_t size)
+static int file_read(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	struct iovec iov;
 	struct uio u; /*user*/
 	struct vnode *vn;
 	struct openfile *of;
-	int result;
+	int result, nread;
 
-	if (fd < 0 || fd > OPEN_MAX)
+	if (!is_valid_fd(fd))
+	{
+		*retval = EBADF;
 		return -1;
+	}
 	of = curproc->fileTable[fd];
 	lock_acquire(of->file_lock);
-	KASSERT(of != NULL);
+	if (of == NULL)
+	{
+		*retval = EBADF;
+		return -1;
+	}
 	vn = of->vn;
-	KASSERT(vn != NULL);
+	if (vn == NULL)
+	{
+		*retval = EINVAL;
+		return -1;
+	}
 
 	/*agisco sulla struct io user*/
 	iov.iov_ubase = buf_ptr;
@@ -189,28 +220,37 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size)
 
 	of->offset = u.uio_offset;
 	lock_release(of->file_lock);
-	return (size - u.uio_resid);
+	nread = size - u.uio_resid;
+
+	return nread;
 }
 
-static int file_write(int fd, userptr_t buf_ptr, size_t size)
+static int file_write(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	struct iovec iov;
 	struct uio u;
-	int result;
+	int result, nwrite;
 	struct vnode *vn;
 	struct openfile *of;
 
-	if (fd < 0 || fd > OPEN_MAX)
+	if (!is_valid_fd(fd))
+	{
+		*retval = EBADF;
 		return -1;
+	}
 	of = curproc->fileTable[fd];
 	KASSERT(of != NULL);
 	if (of == NULL)
 	{
-		return EBADF;
+		*retval = EBADF;
+		return -1;
 	}
 	vn = of->vn;
 	if (vn == NULL)
-		return EINVAL;
+	{
+		*retval = EINVAL;
+		return -1;
+	}
 
 	lock_acquire(of->file_lock);
 	iov.iov_ubase = buf_ptr;
@@ -230,14 +270,16 @@ static int file_write(int fd, userptr_t buf_ptr, size_t size)
 
 	of->offset = u.uio_offset;
 	lock_release(of->file_lock);
-	return (size - u.uio_resid);
+	nwrite = size - u.uio_resid;
+
+	return nwrite;
 }
 
 #endif /*use kernel buffer*/
 
 /*file system calls for open/close*/
 
-int sys_open(userptr_t path, int openflags, mode_t mode, int *errp)
+int sys_open(userptr_t path, int openflags, mode_t mode, int *retval)
 {
 	/*1) opens a file: create an openfile item
 *2) obtain vnode from vfs_open()
@@ -259,7 +301,7 @@ return the file descriptor of the openfile item
 	/*path pointer check*/
 	if (path == NULL)
 	{
-		*errp = EINVAL;
+		*retval = EINVAL;
 		return -1;
 	}
 
@@ -267,7 +309,7 @@ return the file descriptor of the openfile item
 	accmode = openflags & O_ACCMODE;
 	if (accmode != O_RDONLY && accmode != O_WRONLY && accmode != O_RDWR)
 	{
-		*errp = EINVAL;
+		*retval = EINVAL;
 		return -1;
 	}
 
@@ -282,7 +324,7 @@ return the file descriptor of the openfile item
 	result = vfs_open((char *)path, openflags, mode, &v); /*obtain vnode from vfs_open()*/
 	if (result)
 	{
-		*errp = ENOENT;
+		*retval = ENOENT;
 		return -1;
 	}
 
@@ -294,7 +336,7 @@ return the file descriptor of the openfile item
 		{
 			of = &systemFileTable[i];
 			of->vn = v;
-			of->offset = 0;
+			of->offset = 0; /*initialize offset.*/
 			of->accmode = accmode;
 			of->file_lock = lock_create(fname);
 			of->ref_count = 1;
@@ -304,13 +346,13 @@ return the file descriptor of the openfile item
 	if (of->file_lock == NULL)
 	{
 		vfs_close(v);
-		*errp = ENOMEM;
+		*retval = ENOMEM;
 		return -1;
 	}
 	if (of == NULL)
 	{
 		/*non ho trovato posto nella system open file table*/
-		*errp = ENFILE;
+		*retval = ENFILE;
 		lock_destroy(of->file_lock);
 	}
 	else
@@ -321,7 +363,7 @@ return the file descriptor of the openfile item
 			if (result)
 			{
 				vfs_close(v);
-				*errp = EINVAL;
+				*retval = EINVAL;
 				return -1;
 			}
 			of->offset = st.st_size;
@@ -335,13 +377,13 @@ return the file descriptor of the openfile item
 			}
 		}
 		/*no free slot in process open file table*/
-		*errp = EMFILE;
+		*retval = EMFILE;
 	}
 	/*if I'm here, something went wrong*/
 	vfs_close(v);
 	return -1;
 }
-int sys_close(int fd)
+int sys_close(int fd, int *retval)
 {
 	struct openfile *of = NULL;
 	struct vnode *vn;
@@ -350,16 +392,18 @@ int sys_close(int fd)
 	KASSERT(cur != NULL);
 
 	/*Incorrect file descriptor*/
-	if (fd < 0 || fd > OPEN_MAX)
+	if (!is_valid_fd(fd))
 	{
-		return EBADF;
+		*retval = EBADF;
+		return -1;
 	}
 
 	of = curproc->fileTable[fd];
 
 	if (of == NULL)
 	{
-		return EBADF;
+		*retval = EBADF;
+		return -1;
 	}
 
 	curproc->fileTable[fd] = NULL;
@@ -367,10 +411,10 @@ int sys_close(int fd)
 	vn = of->vn;
 	of->vn = NULL;
 	if (vn == NULL)
-		return EINVAL; /* ? */
-
-	/*if(--of->ref_count>0)
-		return 0;*/
+	{
+		*retval = EINVAL;
+		return -1; /* ? */
+	}
 
 	lock_acquire(of->file_lock);
 	/*if it is the last close of this file, free it up*/
@@ -389,11 +433,10 @@ int sys_close(int fd)
 
 	return 0;
 }
-
 /*
  * simple file system calls for write/read
  */
-int sys_write(int fd, userptr_t buf_ptr, size_t size)
+int sys_write(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	int i;
 	char *p = (char *)buf_ptr;
@@ -415,12 +458,12 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size)
 	}
 	else
 	{
-		return file_write(fd, buf_ptr, size);
+		return file_write(fd, buf_ptr, size, retval);
 	}
 
 	return (int)size;
 }
-int sys_read(int fd, userptr_t buf_ptr, size_t size)
+int sys_read(int fd, userptr_t buf_ptr, size_t size, int *retval)
 {
 	char *p = (char *)buf_ptr;
 	int i;
@@ -430,7 +473,8 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size)
 	}
 	if (fd != STDIN_FILENO)
 	{
-		return file_read(fd, buf_ptr, size);
+
+		return file_read(fd, buf_ptr, size, retval);
 	}
 
 	for (i = 0; i < (int)size; i++)
@@ -505,7 +549,7 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
 	/* Check whether new_fd is previously opened and eventually close it */
 	if (systemFileTable[new_fd].vn != NULL)
 	{
-		sys_close(new_fd);
+		sys_close(new_fd, ret_val);
 	}
 
 	// /* Open the new_fd descriptor */

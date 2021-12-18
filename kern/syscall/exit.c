@@ -28,7 +28,7 @@ close_all_files(struct proc *p) {
     {
         if (p->fileTable[i] != NULL)
         {
-            err = sys_close(i);
+            sys_close(i, &err);
             if (err) return -1;
         }
     }
