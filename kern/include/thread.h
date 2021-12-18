@@ -39,7 +39,6 @@
 #include <array.h>
 #include <spinlock.h>
 #include <threadlist.h>
-#include "opt-execv.h"
 
 #include <addrspace.h>
 

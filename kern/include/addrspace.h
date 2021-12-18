@@ -38,8 +38,6 @@
 #include <vm.h>
 #include "opt-dumbvm.h"
 
-/*progetto os161*/
-#include "opt-execv.h"
 struct vnode;
 
 

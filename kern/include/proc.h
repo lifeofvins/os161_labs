@@ -39,7 +39,6 @@
 #include <spinlock.h>
 #include <limits.h>
 #include <current.h>
-#include "opt-fork.h"
 #include <array.h>
 
 struct addrspace;

@@ -8,8 +8,8 @@ vfscwd.o: ../../vfs/vfscwd.c ../../include/types.h \
  opt-hangman.h includelinks/machine/spinlock.h ../../include/limits.h \
  ../../include/kern/limits.h ../../include/current.h \
  includelinks/machine/current.h ../../include/thread.h \
- ../../include/array.h ../../include/threadlist.h opt-execv.h \
+ ../../include/array.h ../../include/threadlist.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h opt-fork.h ../../include/vfs.h \
+ includelinks/kern/machine/setjmp.h ../../include/vfs.h \
  ../../include/fs.h ../../include/vnode.h

@@ -6,7 +6,7 @@ uio.o: ../../lib/uio.c ../../include/types.h ../../include/kern/types.h \
  includelinks/machine/spinlock.h ../../include/limits.h \
  ../../include/kern/limits.h ../../include/current.h \
  includelinks/machine/current.h ../../include/thread.h \
- ../../include/array.h ../../include/threadlist.h opt-execv.h \
+ ../../include/array.h ../../include/threadlist.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h opt-fork.h ../../include/copyinout.h
+ includelinks/kern/machine/setjmp.h ../../include/copyinout.h

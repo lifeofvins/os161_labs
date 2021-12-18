@@ -32,8 +32,6 @@
 
 
 #include <cdefs.h> /* for __DEAD */
-#include "opt-fork.h"
-#include "opt-execv.h"
 
 /*constants for pointer check in system calls*/
 #define KERNEL_PTR ((void *)0x80000000)

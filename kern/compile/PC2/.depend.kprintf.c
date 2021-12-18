@@ -6,8 +6,8 @@ kprintf.o: ../../lib/kprintf.c ../../include/types.h \
  ../../include/spinlock.h ../../include/hangman.h opt-hangman.h \
  includelinks/machine/spinlock.h ../../include/threadlist.h \
  includelinks/machine/vm.h ../../include/thread.h ../../include/array.h \
- opt-execv.h ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
+ ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h ../../include/current.h \
- includelinks/machine/current.h ../../include/synch.h \
+ includelinks/machine/current.h ../../include/synch.h opt-synch.h \
  ../../include/mainbus.h ../../include/vfs.h ../../dev/lamebus/ltrace.h

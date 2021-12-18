@@ -38,8 +38,3 @@ options dumbvm			# Chewing gum and baling wire.
 options synch
 
 
-#progetto
-options fork
-
-options execv
-

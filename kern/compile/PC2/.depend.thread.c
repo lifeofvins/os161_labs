@@ -5,10 +5,11 @@ thread.o: ../../thread/thread.c ../../include/types.h \
  ../../include/array.h ../../include/cpu.h ../../include/spinlock.h \
  ../../include/hangman.h opt-hangman.h includelinks/machine/spinlock.h \
  ../../include/threadlist.h includelinks/machine/vm.h ../../include/spl.h \
- ../../include/wchan.h ../../include/thread.h opt-execv.h \
- ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
- includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h ../../include/threadprivate.h \
- ../../include/proc.h ../../include/limits.h ../../include/kern/limits.h \
- ../../include/current.h includelinks/machine/current.h opt-fork.h \
- ../../include/synch.h ../../include/mainbus.h ../../include/vnode.h
+ ../../include/wchan.h ../../include/thread.h ../../include/addrspace.h \
+ ../../include/vm.h opt-dumbvm.h includelinks/machine/thread.h \
+ ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
+ ../../include/threadprivate.h ../../include/proc.h \
+ ../../include/limits.h ../../include/kern/limits.h \
+ ../../include/current.h includelinks/machine/current.h \
+ ../../include/synch.h opt-synch.h ../../include/mainbus.h \
+ ../../include/vnode.h

@@ -457,9 +457,6 @@ file        syscall/exit.c
 file		syscall/waitpid.c
 file		syscall/getpid.c
 file        syscall/curdir_syscalls.c 
-defoption fork
-optfile fork syscall/fork.c
+file        syscall/fork.c
+file        syscall/execv.c
 
-#PROGETTO (fork già definita prima)
-defoption execv
-optfile execv syscall/execv.c

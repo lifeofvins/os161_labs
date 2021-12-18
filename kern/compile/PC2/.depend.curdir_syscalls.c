@@ -3,10 +3,10 @@ curdir_syscalls.o: ../../syscall/curdir_syscalls.c \
  ../../include/types.h includelinks/machine/types.h \
  ../../include/kern/unistd.h ../../include/clock.h \
  ../../include/kern/time.h ../../include/copyinout.h \
- ../../include/syscall.h ../../include/cdefs.h opt-fork.h opt-execv.h \
- ../../include/lib.h opt-noasserts.h ../../include/kern/errno.h \
- ../../include/kern/limits.h ../../include/vfs.h ../../include/array.h \
- ../../include/uio.h ../../include/kern/iovec.h ../../include/current.h \
+ ../../include/syscall.h ../../include/cdefs.h ../../include/lib.h \
+ opt-noasserts.h ../../include/kern/errno.h ../../include/kern/limits.h \
+ ../../include/vfs.h ../../include/array.h ../../include/uio.h \
+ ../../include/kern/iovec.h ../../include/current.h \
  includelinks/machine/current.h ../../include/thread.h \
  ../../include/spinlock.h ../../include/hangman.h opt-hangman.h \
  includelinks/machine/spinlock.h ../../include/threadlist.h \
