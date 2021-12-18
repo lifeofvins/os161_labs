@@ -37,9 +37,8 @@
 #include <syscall.h>
 #include <copyinout.h>
 
-#if OPT_EXECV
 #include <synch.h>
-#endif
+
 
 /*
  * System call dispatcher.

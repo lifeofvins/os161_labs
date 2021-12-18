@@ -41,9 +41,8 @@
 #include <threadlist.h>
 #include "opt-execv.h"
 
-#if OPT_EXECV
 #include <addrspace.h>
-#endif
+
 
 struct cpu;
 

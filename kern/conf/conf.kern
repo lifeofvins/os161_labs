@@ -447,17 +447,14 @@ optfile net	test/nettest.c
 defoption lab1
 optfile lab1 main/lab1.c
 
-#DEFINISCO OPZIONI PER SYSCALLS LAB2 OS161
 defoption syscalls
 optfile syscalls syscall/file_syscalls.c
 optfile syscalls syscall/exit.c
- 
- 
-#DEFINISCO OPZIONI PER SYNCH LAB3 OS161
+
 defoption synch
 optfile synch thread/synch.c
 
-#DEFINISCO OPZIONI PER LAB4 (PROC_WAIT)
+
 defoption waitpid
 defoption fork
 optfile waitpid syscall/waitpid.c

@@ -91,11 +91,7 @@ void V(struct semaphore *);
 struct lock {
         char *lk_name;
         HANGMAN_LOCKABLE(lk_hangman);   /* Deadlock detector hook. */
-        // add what you need here
-        // (don't forget to mark things volatile as needed)
 #if OPT_SYNCH
-        
-        /*implemento il lock come un semaforo binario che rinforza la mutua esclusione --> solo chi ha acquisito il lock può rilasciarlo*/
 #if SEM
 	struct semaphore *lock_sem;
 #else
@@ -146,8 +142,6 @@ bool lock_do_i_hold(struct lock *);
 /*LAB3: IMPLEMENTO CONDITION VARIABLES*/
 struct cv {
         char *cv_name;
-        // add what you need here
-        // (don't forget to mark things volatile as needed)
 #if OPT_SYNCH
         struct wchan *cv_wchan;
         struct spinlock cv_spinlock;

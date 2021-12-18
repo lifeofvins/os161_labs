@@ -66,11 +66,10 @@ struct vnode;
  * without sleeping.
  */
 
-#if OPT_WAITPID
 /* G.Cabodi - 2019 - implement waitpid: 
    synch with semaphore (1) or cond.var.(0) */
 #define USE_SEMAPHORE_FOR_WAITPID 0
-#endif
+
 
 #define MAX_PROC 100
 struct proc
@@ -85,8 +84,6 @@ struct proc
 	/* VFS */
 	struct vnode *p_cwd; /* current working directory */
 
-	/* add more material here as needed */
-#if OPT_WAITPID
 	/* G.Cabodi - 2019 - implement waitpid: synchro, and exit status */
 	int p_status; /* status as obtained by exit() */
 	pid_t p_pid;  /* process pid */
@@ -100,23 +97,16 @@ struct proc
 	struct cv *p_cv;
 	struct lock *p_cv_lock;
 #endif
-#endif
 
-#if OPT_FILE
-	/*cabodi*/
 	struct openfile *fileTable[OPEN_MAX];
 
-#endif
-
-/*non funziona se metto #if oPT_FORK*/
-#if OPT_FORK
 	struct proc *p_parent;	  /*puntatore al padre*/
 	struct array *p_children; /*array dei figli*/
-#endif
+
 };
-#if OPT_EXECV
+
 struct lock *exec_lock; /*lock used in sys_execv: created in proc_bootstrap() function*/
-#endif
+
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
 
@@ -147,8 +137,8 @@ int proc_wait(struct proc *proc);
 struct proc *proc_search_pid(pid_t pid, pid_t *retval);
 
 /*cabodi*/
-#if OPT_FILE
+
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest);
-#endif
+
 
 #endif /* _PROC_H_ */
