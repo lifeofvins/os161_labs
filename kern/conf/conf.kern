@@ -442,10 +442,13 @@ file		test/kmalloctest.c
 file		test/fstest.c
 optfile net	test/nettest.c
 
-# NEW PDS WORK
 
-defoption lab1
-optfile lab1 main/lab1.c
+########################################
+#                                      #
+#           SDP C2 Project             #
+#                                      #
+########################################
+
 
 defoption syscalls
 optfile syscalls syscall/file_syscalls.c
