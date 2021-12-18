@@ -92,30 +92,30 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	KASSERT(thread != NULL);
 	KASSERT(parent != NULL);
 	if (curproc->p_pid + 1 > MAX_PROC) {
-		*retval = -1;
-		return ENPROC; //too many processes in the system
+		*retval = ENPROC;
+		return -1; //too many processes in the system
 	}
 
 	/*creation of child proc struct*/
 	child = proc_create_runprogram(parent->p_name);
 	if (child == NULL) {
-		*retval = -1;
-		return ENOMEM;
+		*retval = ENOMEM;
+		return -1;
 	}
 	new_pid = child->p_pid;
 
 	/*check if generated pid is valid*/
 	if (new_pid < PID_MIN || new_pid > PID_MAX) {
-		*retval = -1;
+		*retval = EINVAL;
 		proc_destroy(child);
-		return EINVAL;
+		return -1;
 	}
 
 	tf_child = kmalloc(sizeof(struct trapframe)); 
 	if (tf_child == NULL) {
-		*retval = -1;
+		*retval = ENOMEM;
 		proc_destroy(child);
-		return ENOMEM;
+		return -1;
 	}
 
 	/*copy of parent's trapframe*/
@@ -141,10 +141,10 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 		(void *)tf_child, (unsigned long)0);
 
 	if (result) {
-		*retval = -1;
+		*retval = ENOMEM;
 		proc_destroy(child);
 		kfree(tf_child);
-		return ENOMEM;
+		return -1;
 	}
 
 	*retval = child->p_pid; /*parent returns with child's pid immediately*/

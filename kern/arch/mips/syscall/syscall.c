@@ -211,7 +211,11 @@ void syscall(struct trapframe *tf)
 
 #if OPT_FORK
 	case SYS_fork:
-		err = sys_fork(tf, &retval);
+		retval = sys_fork(tf, &err);
+		if (retval >= 0) {
+			retval = err;
+			err = 0;
+		}
 		break;
 #endif /*OPT_FORK*/
 

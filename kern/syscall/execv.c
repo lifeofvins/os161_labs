@@ -19,10 +19,8 @@
 #include <syscall.h>
 
 /*Shared data structures --> we need a lock for them (exec_lock)*/
-static char karg[ARG_MAX];			   /*argument string, it's not a string array*/
-static unsigned char kargbuf[ARG_MAX]; /*array of bytes*/
-
-#define MAX_PROG_NAME 32
+static char karg[ARG_MAX];			/*argument string, it's not a string array*/
+static unsigned char kbuf[ARG_MAX]; /*array of bytes*/
 
 /*
  * This function returns the required padding for user args
@@ -48,19 +46,13 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 {
 	int i;
 	int err;
-	int padding = 0; /*last argument*/
-	unsigned char *p_begin = NULL;
-	unsigned char *p_end = NULL;
-	volatile int offset; //volatile so it isn't optimized out during debug
-	int last_offset;
-
+	int padding = 0;
+	unsigned char *p_begin = kbuf;
+	int last_offset = argc * sizeof(char *);
+	unsigned char *p_end = p_begin + last_offset;
+	volatile int offset;
 	*buflen = 0;
 
-	/*initialize kernel buffer*/
-	p_begin = kargbuf; /*they both point to the same memory region*/
-	last_offset = argc * sizeof(char *);
-	p_end = p_begin + last_offset;
-	padding = 0;
 	i = 0;
 	while (args[i] != NULL)
 	{
@@ -68,26 +60,17 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 		if (err)
 			return err;
 
-		/*now I have in karg the i-th argument*/
 		offset = last_offset + padding;
 		padding = padded_length(karg, 4);
 
-		//copy the string the buffer.
-		/*
-		 *void *memcpy(void *dest, const void *src, size_t len);
-		 *copies n characters from memory area src to memory area dest.
-		 */
 		memcpy(p_end, karg, padding);
 
-		/*save the offset*/
 		*p_begin = offset;
 
 		p_end += padding;
 
-		//advance p_begin by 4 bytes --> go to next argument for next iteration.
 		p_begin += sizeof(char *);
 
-		//adjust last offset
 		last_offset = offset;
 
 		++i;
@@ -99,28 +82,28 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 }
 
 /*
- * This function modifies the kargbuf content in order to store
+ * This function modifies the kbuf content in order to store
  * user stack position of the passed arguments
  */
 static int
-change_kargbuf_for_userstack(int nparams, vaddr_t stackptr)
+change_kbuf_for_userstack(int argc, vaddr_t stackptr)
 {
 	int i;
 	int new_offset = 0;
 	int old_offset = 0;
 	int index;
 
-	for (i = 0; i < nparams - 1; ++i)
+	for (i = 0; i < argc - 1; ++i)
 	{
 		index = i * sizeof(char *); //position of the i-th argument
 		//read the old offset.
-		old_offset = kargbuf[index];
+		old_offset = kbuf[index];
 
 		//calculate the new offset
 		new_offset = stackptr + old_offset;
 
 		//store it instead of the old one.
-		memcpy(kargbuf + index, &new_offset, sizeof(int));
+		memcpy(kbuf + index, &new_offset, sizeof(int));
 	}
 
 	return 0;
@@ -166,9 +149,8 @@ int sys_execv(char *program, char **args)
 	/*find how many arguments*/
 	for (i = 0; args[i] != NULL; i++)
 		;
-	argc = i + 1; //count also the last NULL argument
+	argc = i + 1; //last NULL 
 
-	//copy the arguments into the kernel buffer.
 	err = copy_args_to_kbuf(args, argc, &buflen);
 	if (err)
 	{
@@ -176,7 +158,7 @@ int sys_execv(char *program, char **args)
 		vfs_close(vn);
 		return err;
 	}
-	//copyin the program name.
+
 	len = strlen(program) + 1;
 	kprogram = kmalloc(len);
 	if (kprogram == NULL)
@@ -243,7 +225,7 @@ int sys_execv(char *program, char **args)
 	 *i.e if I lower by buflen I go to the user stack
 	 */
 	stackptr -= buflen;
-	err = change_kargbuf_for_userstack(argc, stackptr);
+	err = change_kbuf_for_userstack(argc, stackptr);
 	if (err)
 	{
 		proc_setas(oldas);
@@ -256,7 +238,7 @@ int sys_execv(char *program, char **args)
 	}
 
 	//copy the arguments into the new user stack.
-	err = copyout((void *)kargbuf, (userptr_t)stackptr, buflen);
+	err = copyout((void *)kbuf, (userptr_t)stackptr, buflen);
 	if (err)
 	{
 		proc_setas(oldas);
