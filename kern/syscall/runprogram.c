@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
  *	The President and Fellows of Harvard College.
@@ -67,13 +68,12 @@ runprogram(char *progname, unsigned long argc, char **args)
 	vaddr_t entrypoint, stackptr;
 	int result;
 
-#if OPT_EXECV
 	int i;
 	size_t len;
 	size_t stack_offset = 0;
 	char **argvptr;
 	vaddr_t uprogname[1];
-#endif
+
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -113,7 +113,6 @@ runprogram(char *progname, unsigned long argc, char **args)
 		return result;
 	}
 
-#if OPT_EXECV
 	if (args != NULL) {
 		/*program has arguments*/
 		argvptr = (char **)kmalloc(argc*sizeof(char **));
@@ -167,13 +166,7 @@ runprogram(char *progname, unsigned long argc, char **args)
 			  stackptr, entrypoint);
 
 	}
-#else
-	/* Warp to user mode. */
-	enter_new_process(0, NULL,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
-#endif
-	/* enter_new_process does not return. */
+
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }

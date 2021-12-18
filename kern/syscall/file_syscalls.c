@@ -13,8 +13,6 @@
 #include <lib.h>
 #include "opt-file.h"
 
-#if OPT_FILE
-
 #include <copyinout.h>
 #include <vnode.h>
 #include <vfs.h>
@@ -296,7 +294,7 @@ return the file descriptor of the openfile item
 		{
 			of = &systemFileTable[i];
 			of->vn = v;
-			of->offset = 0; 
+			of->offset = 0;
 			of->accmode = accmode;
 			of->file_lock = lock_create(fname);
 			of->ref_count = 1;
@@ -392,8 +390,6 @@ int sys_close(int fd)
 	return 0;
 }
 
-#endif /*OPT_FILE riga 15*/
-
 /*
  * simple file system calls for write/read
  */
@@ -419,11 +415,7 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size)
 	}
 	else
 	{
-#if OPT_FILE
 		return file_write(fd, buf_ptr, size);
-#else
-		return -1;
-#endif
 	}
 
 	return (int)size;
@@ -438,12 +430,7 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size)
 	}
 	if (fd != STDIN_FILENO)
 	{
-#if OPT_FILE
 		return file_read(fd, buf_ptr, size);
-#else
-		kprintf("sys_read supported only to stdin\n");
-		return -1;
-#endif
 	}
 
 	for (i = 0; i < (int)size; i++)

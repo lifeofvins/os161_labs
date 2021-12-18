@@ -54,7 +54,6 @@
 
 #define MAXMENUARGS  16
 
-#define PROJECT 0 /*support for waitpid, sdp project*/
 
 ////////////////////////////////////////////////////////////
 //
@@ -143,18 +142,10 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
-	 /*LAB04: devo gestire waitpid --> exit_code = proc_wait(proc);*/
-#if OPT_WAITPID
-#if PROJECT
-	userptr_t statusp = NULL;
-	pid_t pid = sys_getpid();
-	int retpid = sys_waitpid(pid, statusp, 0, (pid_t *)&exit_code);
-	return retpid;
-#else
+	 /*LAB04*/
+
 	exit_code = proc_wait(proc);
 	return exit_code;
-#endif /*PROJECT*/
-#endif /*OPT_WAITPID*/
 	return 0;
 }
 

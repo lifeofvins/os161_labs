@@ -27,7 +27,7 @@
  */
 void enter_forked_process(struct trapframe *tf)
 {
-#if OPT_FORK
+
 	// Duplicate frame so it's on stack (now it's in the heap)
 	struct trapframe forkedTf = *tf; // copy trap frame onto kernel stack
 	forkedTf.tf_v0 = 0; // return value is 0
@@ -39,15 +39,13 @@ void enter_forked_process(struct trapframe *tf)
 	as_activate();
 
 	mips_usermode(&forkedTf);
-#else
-	(void)tf;
-#endif
+
 }
 
 /*
  * Caller function for enter_forked_process
  */
-#if OPT_FORK
+
 static void
 call_enter_forked_process(void *tfv)
 {
@@ -150,4 +148,4 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	*retval = child->p_pid; /*parent returns with child's pid immediately*/
 	return 0;
 }
-#endif 
+ 

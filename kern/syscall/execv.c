@@ -73,7 +73,7 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 
 		last_offset = offset;
 
-		++i;
+		i++;
 		*buflen += padding + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
 	}
 
@@ -150,12 +150,13 @@ int sys_execv(char *program, char **args)
 	for (i = 0; args[i] != NULL; i++)
 		;
 	argc = i + 1; //last NULL 
-
+	if (argc > ARG_MAX) {
+		return E2BIG;
+	}
 	err = copy_args_to_kbuf(args, argc, &buflen);
 	if (err)
 	{
 		lock_release(exec_lock);
-		vfs_close(vn);
 		return err;
 	}
 

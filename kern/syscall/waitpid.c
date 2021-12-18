@@ -19,7 +19,7 @@
 int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err)
 {
 
-#if OPT_WAITPID
+
 
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL);
@@ -117,10 +117,5 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err)
     }
 
     return p->p_pid;
-#else
-    (void)options; /* not handled */
-    (void)pid;
-    (void)statusp;
-    return -1;
-#endif
+
 }

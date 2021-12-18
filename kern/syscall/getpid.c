@@ -16,14 +16,12 @@
 pid_t sys_getpid(void)
 {
 	pid_t pid;
-#if OPT_WAITPID
+
 	KASSERT(curproc != NULL);
 	pid = curproc->p_pid;
 
 	return pid;
-#else
-	return -1;
-#endif
+
 }
 
 

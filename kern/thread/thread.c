@@ -552,12 +552,12 @@ thread_fork(const char *name,
 	/* Set up the switchframe so entrypoint() gets called */
 	switchframe_init(newthread, entrypoint, data1, data2);
 
-#if OPT_FORK
-	/*Copy parent's fileTable in mutual exclusion*/
+
+	/*Copy parent's fileTable in mutual exclusion (sys_fork)*/
 	lock_acquire(curproc->p_lock);
 	proc_file_table_copy(curproc, proc);
 	lock_release(curproc->p_lock);
-#endif
+
 	/* Lock the current cpu's run queue and make the new thread runnable */
 	thread_make_runnable(newthread, false);
 
@@ -798,13 +798,9 @@ thread_exit(void)
 	struct thread *cur;
 
 	cur = curthread;
-	
-#if OPT_WAITPID
+
 	if (cur->t_proc != NULL)
 		proc_remthread(cur);
-#else
-	proc_remthread(cur);
-#endif
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
 	KASSERT(cur->t_proc == NULL);

@@ -51,11 +51,8 @@
 #include <syscall.h>
 #include <kern/errno.h>
 
-#if OPT_FORK
 #include <array.h>
-#endif
 
-#if OPT_WAITPID
 #include <synch.h>
 #include <kern/wait.h>
 
@@ -68,7 +65,6 @@ static struct _processTable
 
 } processTable;
 
-#endif
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -81,7 +77,6 @@ struct proc *kproc;
 struct proc *
 proc_search_pid(pid_t pid, pid_t *err)
 {
-#if OPT_WAITPID
 	struct proc *p;
 	if (pid < 0 || pid > MAX_PROC)
 	{
@@ -98,10 +93,7 @@ proc_search_pid(pid_t pid, pid_t *err)
 	}
 	spinlock_release(&processTable.lk);
 	return p;
-#else
-	(void)pid;
-	return NULL;
-#endif
+
 }
 
 /*
@@ -111,7 +103,6 @@ proc_search_pid(pid_t pid, pid_t *err)
 static void
 proc_init_waitpid(struct proc *proc, const char *name)
 {
-#if OPT_WAITPID
 	/* search a free index in table using a circular strategy */
 	int i;
 	spinlock_acquire(&processTable.lk);
@@ -146,10 +137,7 @@ proc_init_waitpid(struct proc *proc, const char *name)
 	proc->p_cv_lock = lock_create("cv_lock");
 	proc->p_cv = cv_create(name);
 #endif
-#else
-	(void)proc;
-	(void)name;
-#endif
+
 }
 
 /*
@@ -159,7 +147,6 @@ proc_init_waitpid(struct proc *proc, const char *name)
 static void
 proc_end_waitpid(struct proc *proc)
 {
-#if OPT_WAITPID
 	/* remove the process from the table */
 	int i;
 	spinlock_acquire(&processTable.lk);
@@ -175,9 +162,7 @@ proc_end_waitpid(struct proc *proc)
 	cv_destroy(proc->p_cv);
 #endif
 	lock_destroy(proc->p_lock);
-#else
-	(void)proc;
-#endif
+
 }
 
 /*
@@ -213,18 +198,13 @@ proc_create(const char *name)
 
 	proc->p_exited = false;
 
-#if OPT_FILE
 	/*create per process fileTable*/
-	/*cabodi*/
 
 	bzero(proc->fileTable, OPEN_MAX * sizeof(struct openfile *));
 
-#endif
-
-#if OPT_FORK
 	proc->p_parent = NULL;
 	proc->p_children = array_create(); /*alloco/inizializzo l'array di figli*/
-#endif
+
 
 	return proc;
 }
@@ -319,34 +299,27 @@ void proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 
-#if OPT_FORK
-	unsigned i;			   /*indice del for per svuotare l'array di figli*/
-	volatile unsigned dim; /*salvo la dimensione dell'array dei figli*/
-	volatile struct proc *arr_debug;
+
+	unsigned i;	
+	volatile unsigned dim; 
 	if (proc->p_parent != NULL)
 		proc->p_parent = NULL;
 
-	/*rimuovo anche tutti i figli del processo, se ce li ha*/
+	/*remove all children, if they exist*/
 	if (proc->p_children->num > 0)
 	{
-		/*ha dei figli*/
 		dim = proc->p_children->num;
 		for (i = 0; i < dim; i++)
 		{
-			arr_debug = (struct proc *)array_get(proc->p_children, 0);
-			KASSERT(arr_debug != NULL);
 			array_remove(proc->p_children, 0);
 		}
 	}
 
-	/*se il processo non ha figli ha già l'array dei figli vuoto*/
+	array_destroy(proc->p_children); /*array must be empty*/
 
-	array_destroy(proc->p_children); /*l'array deve essere vuoto*/
-
-	/*metto a NULL*/
 	proc->p_children = NULL;
 	KASSERT(proc->p_children == NULL);
-#endif
+
 	kfree(proc);
 }
 
@@ -360,18 +333,17 @@ void proc_bootstrap(void)
 	{
 		panic("proc_create for kproc failed\n");
 	}
-#if OPT_WAITPID
+
 	spinlock_init(&processTable.lk);
 	/* kernel process is not registered in the table */
 	processTable.active = 1;
-#if OPT_EXECV
+
 	exec_lock = lock_create("exec_lock");
 	if (exec_lock == NULL)
 	{
 		panic("Could not create exec_lock.\n");
 	}
-#endif
-#endif
+
 }
 
 /*
@@ -512,10 +484,9 @@ proc_setas(struct addrspace *newas)
 
 /* G.Cabodi - 2019 - support for waitpid */
 
-/***********************************PROC_WAIT**************************************************/
 int proc_wait(struct proc *proc)
 {
-#if OPT_WAITPID
+
 	int return_status;
 	/* NULL and kernel proc forbidden */
 	KASSERT(proc != NULL);
@@ -542,16 +513,9 @@ int proc_wait(struct proc *proc)
 	//unlock and destroy
 	proc_destroy(proc);
 	return return_status;
-#else
-	/* this doesn't synchronize */
-	(void)proc;
-	return 0;
-#endif
 }
 
-/*cabodi lab 05*/
-
-#if OPT_FILE
+/*from lab05*/
 void proc_file_table_copy(struct proc *psrc, struct proc *pdest)
 {
 	int fd;
@@ -566,6 +530,5 @@ void proc_file_table_copy(struct proc *psrc, struct proc *pdest)
 	}
 }
 
-#endif
 
 

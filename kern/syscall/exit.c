@@ -36,7 +36,6 @@ close_all_files(struct proc *p) {
 }
 void sys__exit(int status)
 {
-#if OPT_WAITPID
     struct proc *p = curproc;
     int err;
 
@@ -57,11 +56,7 @@ void sys__exit(int status)
     cv_signal(p->p_cv, p->p_cv_lock);
     lock_release(p->p_cv_lock);
 #endif /*SEMAPHORE*/
-#else
-    /* get address space of current process and destroy */
-    struct addrspace *as = proc_getas();
-    as_destroy(as);
-#endif /*OPT_WAITPID*/
+
     thread_exit();
 
     panic("thread_exit returned (should not happen)\n");

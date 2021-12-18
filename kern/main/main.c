@@ -51,9 +51,6 @@
 #include <version.h>
 #include "autoconf.h"  // for pseudoconfig
 
-#include "lab1.h"
-
-
 /*
  * These two pieces of data are maintained by the makefiles and build system.
  * buildconfig is the name of the config file the kernel was configured with.
@@ -212,9 +209,6 @@ kmain(char *arguments)
 {
 	boot();
 
-	#if OPT_LAB1
-	lab1();
-	#endif
 	menu(arguments);
 
 	/* Should not get here */
