@@ -10,5 +10,4 @@ dumbvm.o: ../../arch/mips/vm/dumbvm.c ../../include/types.h \
  ../../include/thread.h ../../include/array.h opt-execv.h \
  ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h opt-waitpid.h opt-file.h opt-fork.h \
- includelinks/mips/tlb.h
+ includelinks/kern/machine/setjmp.h opt-fork.h includelinks/mips/tlb.h

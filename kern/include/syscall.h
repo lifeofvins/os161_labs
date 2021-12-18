@@ -32,9 +32,7 @@
 
 
 #include <cdefs.h> /* for __DEAD */
-#include "opt-syscalls.h"
 #include "opt-fork.h"
-#include "opt-file.h"
 #include "opt-execv.h"
 
 /*constants for pointer check in system calls*/

@@ -11,8 +11,7 @@ main.o: ../../main/main.c ../../include/types.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h ../../include/proc.h \
  ../../include/limits.h ../../include/kern/limits.h \
- ../../include/current.h includelinks/machine/current.h opt-waitpid.h \
- opt-file.h opt-fork.h ../../include/synch.h opt-synch.h \
- ../../include/mainbus.h ../../include/vfs.h ../../include/device.h \
- ../../include/syscall.h opt-syscalls.h ../../include/test.h \
+ ../../include/current.h includelinks/machine/current.h opt-fork.h \
+ ../../include/synch.h ../../include/mainbus.h ../../include/vfs.h \
+ ../../include/device.h ../../include/syscall.h ../../include/test.h \
  ../../include/version.h autoconf.h

@@ -8,4 +8,4 @@ synch.o: ../../thread/synch.c ../../include/types.h \
  includelinks/machine/vm.h opt-dumbvm.h includelinks/machine/thread.h \
  ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
  ../../include/current.h includelinks/machine/current.h \
- ../../include/synch.h opt-synch.h
+ ../../include/synch.h

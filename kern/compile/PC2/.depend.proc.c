@@ -9,7 +9,6 @@ proc.o: ../../proc/proc.c ../../include/types.h \
  ../../include/threadlist.h opt-execv.h ../../include/addrspace.h \
  ../../include/vm.h includelinks/machine/vm.h opt-dumbvm.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h opt-waitpid.h opt-file.h opt-fork.h \
- ../../include/vnode.h ../../include/syscall.h opt-syscalls.h \
- ../../include/kern/errno.h ../../include/synch.h opt-synch.h \
+ includelinks/kern/machine/setjmp.h opt-fork.h ../../include/vnode.h \
+ ../../include/syscall.h ../../include/kern/errno.h ../../include/synch.h \
  ../../include/kern/wait.h

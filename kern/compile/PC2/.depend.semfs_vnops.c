@@ -4,14 +4,14 @@ semfs_vnops.o: ../../fs/semfs/semfs_vnops.c ../../include/types.h \
  ../../include/kern/fcntl.h ../../include/stat.h \
  ../../include/kern/stat.h ../../include/kern/stattypes.h \
  ../../include/uio.h ../../include/kern/iovec.h ../../include/synch.h \
- opt-synch.h ../../include/spinlock.h ../../include/cdefs.h \
- ../../include/hangman.h opt-hangman.h includelinks/machine/spinlock.h \
- ../../include/thread.h ../../include/array.h ../../include/lib.h \
- opt-noasserts.h ../../include/threadlist.h opt-execv.h \
- ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
- opt-dumbvm.h includelinks/machine/thread.h ../../include/setjmp.h \
+ ../../include/spinlock.h ../../include/cdefs.h ../../include/hangman.h \
+ opt-hangman.h includelinks/machine/spinlock.h ../../include/thread.h \
+ ../../include/array.h ../../include/lib.h opt-noasserts.h \
+ ../../include/threadlist.h opt-execv.h ../../include/addrspace.h \
+ ../../include/vm.h includelinks/machine/vm.h opt-dumbvm.h \
+ includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h ../../include/proc.h \
  ../../include/limits.h ../../include/kern/limits.h \
- ../../include/current.h includelinks/machine/current.h opt-waitpid.h \
- opt-file.h opt-fork.h ../../include/vfs.h ../../include/vnode.h \
- ../../fs/semfs/semfs.h ../../include/fs.h
+ ../../include/current.h includelinks/machine/current.h opt-fork.h \
+ ../../include/vfs.h ../../include/vnode.h ../../fs/semfs/semfs.h \
+ ../../include/fs.h

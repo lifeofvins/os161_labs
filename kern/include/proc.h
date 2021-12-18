@@ -39,8 +39,6 @@
 #include <spinlock.h>
 #include <limits.h>
 #include <current.h>
-#include "opt-waitpid.h"
-#include "opt-file.h"
 #include "opt-fork.h"
 #include <array.h>
 

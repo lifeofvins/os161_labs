@@ -9,5 +9,5 @@ kprintf.o: ../../lib/kprintf.c ../../include/types.h \
  opt-execv.h ../../include/addrspace.h ../../include/vm.h opt-dumbvm.h \
  includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h ../../include/current.h \
- includelinks/machine/current.h ../../include/synch.h opt-synch.h \
+ includelinks/machine/current.h ../../include/synch.h \
  ../../include/mainbus.h ../../include/vfs.h ../../dev/lamebus/ltrace.h

@@ -33,11 +33,6 @@
 #define _SYNCH_H_
 
 
-#include "opt-synch.h"
-
-
-
-
 /*
  * Header file for synchronization primitives.
  */
@@ -46,7 +41,7 @@
 #include <spinlock.h>
 
 /*LAB3*/
-
+#include "opt-synch.h"
 
 #define SEM 0
 /*

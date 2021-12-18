@@ -449,26 +449,16 @@ optfile net	test/nettest.c
 #                                      #
 ########################################
 
-
-defoption syscalls
-optfile syscalls syscall/file_syscalls.c
-optfile syscalls syscall/exit.c
-
 defoption synch
 optfile synch thread/synch.c
 
-
-defoption waitpid
+file        syscall/file_syscalls.c 
+file        syscall/exit.c 
+file		syscall/waitpid.c
+file		syscall/getpid.c
+file        syscall/curdir_syscalls.c 
 defoption fork
-optfile waitpid syscall/waitpid.c
-optfile waitpid syscall/getpid.c
 optfile fork syscall/fork.c
-
-
-#DEFINISCO OPZIONI PER LAB5 (FILE)
-defoption file
-optfile file syscall/file_syscalls.c
-optfile file syscall/curdir_syscalls.c
 
 #PROGETTO (fork già definita prima)
 defoption execv

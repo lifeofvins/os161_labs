@@ -6,5 +6,5 @@ threadtest.o: ../../test/threadtest.c ../../include/types.h \
  includelinks/machine/spinlock.h ../../include/threadlist.h opt-execv.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h includelinks/machine/thread.h ../../include/setjmp.h \
- includelinks/kern/machine/setjmp.h ../../include/synch.h opt-synch.h \
+ includelinks/kern/machine/setjmp.h ../../include/synch.h \
  ../../include/test.h

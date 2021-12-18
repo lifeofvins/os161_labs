@@ -33,18 +33,10 @@ options sfs			# Always use the file system
 
 options dumbvm			# Chewing gum and baling wire.
 
-#lab2 os161
-options syscalls
 
 #lab3 os161
 options synch
 
-#lab4 os161: proc wait
-
-options waitpid
-
-#lab05 os161: file
-options file
 
 #progetto
 options fork
