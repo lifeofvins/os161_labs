@@ -11,4 +11,4 @@ waitpid.o: ../../syscall/waitpid.c ../../include/types.h \
  ../../include/addrspace.h ../../include/vm.h includelinks/machine/vm.h \
  opt-dumbvm.h includelinks/machine/thread.h ../../include/setjmp.h \
  includelinks/kern/machine/setjmp.h opt-waitpid.h ../../include/synch.h \
- opt-synch.h ../../include/kern/wait.h
+ opt-synch.h ../../include/kern/wait.h ../../include/copyinout.h

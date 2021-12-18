@@ -49,6 +49,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <syscall.h>
+#include <kern/errno.h>
 
 #if OPT_FORK
 #include <array.h>
@@ -78,22 +79,21 @@ struct proc *kproc;
  * Initialize support for pid/waitpid.
  */
 struct proc *
-proc_search_pid(pid_t pid, pid_t *retval)
+proc_search_pid(pid_t pid, pid_t *err)
 {
 #if OPT_WAITPID
 	struct proc *p;
 	if (pid < 0 || pid > MAX_PROC)
 	{
-		*retval = -1;
+		*err = EBADF;
 		return NULL;
 	}
 	spinlock_acquire(&processTable.lk);
 	p = processTable.proc[pid];
 	if (p->p_pid != pid)
 	{
-		//invece di KASSERT
 		spinlock_release(&processTable.lk);
-		*retval = -1;
+		*err = -1;
 		return NULL;
 	}
 	spinlock_release(&processTable.lk);

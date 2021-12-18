@@ -16,7 +16,7 @@
 #include <kern/wait.h>
 #include <copyinout.h>
 
-int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
+int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err)
 {
 
 #if OPT_WAITPID
@@ -27,84 +27,84 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
     /*status pointer check invalid alignment*/
     if ((unsigned int)statusp & 0x3)
     {
-        *retval = -1;
-        return EFAULT;
+        *err = EFAULT;
+        return -1;
     }
     /*null status pointer*/
     if (statusp == NULL)
     {
-        *retval = -1;
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     /*status must point to userland*/
     if ((void *)statusp >= KERNEL_PTR)
     {
-        *retval = -1;
-        return EFAULT;
+        *err = EFAULT;
+        return -1;
     }
 
     /*invalid ptr*/
     if ((void *)statusp == INVALID_PTR)
     {
-        *retval = -1;
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     /*options check*/
     if (options != 0 && options != WNOHANG)
     {
-        *retval = -1;
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     //invalid pid check
     if (pid <= 0)
     {
-        *retval = -1;
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     //get the process associated with the given pid
-    struct proc *p = proc_search_pid(pid, retval);
+    struct proc *p = proc_search_pid(pid, err);
     int s;
 
     if (p == NULL)
     {
         //the pid doesn't exist
-        *retval = -1;
-        return ESRCH; //the pid argument named a nonexistent process
+        *err = ESRCH; //the pid argument named a nonexistent process
+        return -1; 
     }
     if (pid > PID_MAX || pid < PID_MIN)
     {
-        *retval = -1;
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     //a process cannot wait for itself
     if (p == curproc)
     {
-        *retval = -1;
-        return EPERM; //operation not permitted
+        *err = EPERM;
+        return -1; //operation not permitted
     }
     //a process cannot wait for its parent
     if (p == curproc->p_parent)
     {
-        *retval = -1;
-        return EPERM;
+        *err = EPERM;
+        return -1;
     }
     //if the pid exists, are we allowed to wait for it? i.e, is it our child?
     if (curproc != p->p_parent)
     {
-        *retval = -1;
-        return ECHILD;
+        *err = ECHILD;
+        return -1;
     }
     //sys_waitpid returns error if the calling process doesn't have any child
     if (curproc->p_children->num == 0)
     {
-        *retval = -1;
-        return ECHILD;
+        *err = ECHILD;
+        return -1;
     }
 
     //if WNOHANG was given, and said process is not yet dead, we immediately return 0
     if (options == WNOHANG && !p->p_exited)
     {
-        *retval = 0;
+        *err = 0;
         return 0;
     }
     s = proc_wait(p);
@@ -112,7 +112,7 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *retval)
     /*copy onto user space the return status*/
     result = copyout(&s, statusp, sizeof(int));
     if (result) {
-        *retval = -1;
+        *err = -1;
         return result;
     }
 

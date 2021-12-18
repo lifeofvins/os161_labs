@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "functional": "c"
+        "functional": "c",
+        "errno.h": "c",
+        "array.h": "c"
     }
 }
