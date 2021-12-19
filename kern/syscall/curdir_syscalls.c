@@ -29,22 +29,22 @@ void uspace_uio_kinit(struct uio *, struct iovec *, userptr_t, size_t);
  * Parameters:
  * - buf: pointer to the buffer which will store the cwd
  * - size: size of the buffer
- * - return_value: this contains
+ * - err: this contains
  *      -> -1 on failure
  *      -> the amount of data read on success
  * 
  * Return value:
- * - 0: success
- * - error_code: failure
+ * - the size of the string read, if the operation has been successfully completed
+ * - -1, if there's been an error (see err for the error code)
  */
-int sys___getcwd(userptr_t buf, size_t size, int *return_value)
+int sys___getcwd(userptr_t buf, size_t size, int *err)
 {
     KASSERT(buf != 0x00);
     KASSERT(size > 0);
 
     struct uio uio;
     struct iovec iovec;
-    int vfs_return_value;
+    int vfs_err;
 
     /* 
         This could be a useful check for whether the 
@@ -53,30 +53,29 @@ int sys___getcwd(userptr_t buf, size_t size, int *return_value)
     struct vnode *cwd_vn = curproc->p_cwd;
     if (cwd_vn == 0x00)
     {
-        *return_value = -1;
+        *err = -1;
         return ENOENT;
     }
 
     /* Setting the user space without involving the kernel level address space */
     uspace_uio_kinit(&uio, &iovec, buf, size);
 
-    vfs_return_value = vfs_getcwd(&uio);
-    if (vfs_return_value != 0)
+    vfs_err = vfs_getcwd(&uio);
+    if (vfs_err != 0)
     {
-        *return_value = -1;
-        return vfs_return_value;
+        *err = -1;
+        return vfs_err;
     }
 
+    *err = 0;
+
     /**
-     * return_value contains how many characters have
-     * been read. uio.uio_resid contains the 
+     * uio.uio_resid contains the 
      * "remaining amt of data to xfer", so
      * size - uio.uio_resid is equal to the
      * amount of read data.
      */
-    *return_value = size - uio.uio_resid;
-
-    return 0;
+    return size - uio.uio_resid;
 }
 
 /**

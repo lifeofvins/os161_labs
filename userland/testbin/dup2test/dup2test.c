@@ -67,7 +67,14 @@ int main()
 
 	dup2(fd1, STDOUT_FILENO);
 
+<<<<<<< HEAD
 	printf("%s", out_text);
+=======
+	printf("--Using printf...--\n");
+	printf("%s", out_text);
+	printf("\n--Using puts...--\n");
+	puts(out_text);
+>>>>>>> b298c1dcab5c721e63f8d5efddec1f779be12a82
 	
 	return 0;
 }
