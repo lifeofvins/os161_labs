@@ -1,9 +1,3 @@
-/*
- * AUthor: G.Cabodi
- * Very simple implementation of sys_read and sys_write.
- * just works (partially) on stdin/stdout
- */
-
 #include <types.h>
 #include <kern/unistd.h>
 #include <kern/errno.h>
@@ -26,7 +20,7 @@
 /*max num of system wide open file*/
 #define SYSTEM_OPEN_MAX 10 * OPEN_MAX
 
-#define USE_KERNEL_BUFFER 1 //cabodi
+#define USE_KERNEL_BUFFER 0
 
 struct openfile
 {
@@ -39,6 +33,26 @@ struct openfile
 };
 
 struct openfile systemFileTable[SYSTEM_OPEN_MAX];
+
+/**
+ * Checks whether the file descriptor has been really allocated.
+ * 
+ * Parameter:
+ * - fd: file descriptor to be tested
+ * 
+ * Return value:
+ * - 0, if fd is not valid
+ * - whatever else otherwise
+ */
+static int 
+is_valid_fd(int fd)
+{
+	if (fd < 0 || fd > OPEN_MAX)
+		return 0;
+	if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
+		return 1;
+	return !(curproc->fileTable[fd] == NULL);
+}
 
 void openfileIncrRefCount(struct openfile *of)
 {
@@ -412,7 +426,7 @@ int sys_close(int fd, int *err)
 	if (vn == NULL)
 	{
 		*err = EINVAL;
-		return -1; /* ? */
+		return -1;
 	}
 
 	lock_acquire(of->file_lock);
@@ -451,6 +465,10 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err)
 	}
 	if (fd == STDOUT_FILENO || fd == STDERR_FILENO)
 	{
+		if (curproc->fileTable[fd] != NULL)
+		{
+			return file_write(fd, buf_ptr, size, err);
+		}
 		for (i = 0; i < (int)size; i++)
 		{
 			putch(p[i]);
@@ -474,7 +492,10 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 	}
 	if (fd != STDIN_FILENO)
 	{
-
+		if (curproc->fileTable[fd] != NULL)
+		{
+			return file_read(fd, buf_ptr, size, err);
+		}
 		return file_read(fd, buf_ptr, size, err);
 	}
 
@@ -487,6 +508,7 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 
 	return (int)size;
 }
+
 /**
  * Implementation of the dup2 system call.
  * 
@@ -496,24 +518,24 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
  * Parameters:
  * - old_fd: the old file descriptor
  * - new_fd: the new file descriptor
- * - ret_val: integer pointer set to 0 if it's all
+ * - err: integer pointer set to new_fd if it's all
  *            gone ok, -1 otherwise.
  * 
  * Example of usage:
  *      int logfd = open("logfile", O_WRONLY);
  *      dup2(logfd, STDOUT_FILENO); 
- *      close(logfd);
  *      printf("Hello, OS161.\n");
  * 
  * 
  * Return value:
- * 0: operation completed successfully
- * error code if there's been an error. 
+ * 0: on success
+ * -1: on failure 
  */
-
-int sys_dup2(int old_fd, int new_fd, int *ret_val)
+int 
+sys_dup2(int old_fd, int new_fd, int *err)
 {
-	struct openfile of;
+	spinlock_acquire(&curproc->p_spinlock);
+
 	/**
      * Error handling:
      * File descriptors cannot be negative integer numbers
@@ -523,49 +545,62 @@ int sys_dup2(int old_fd, int new_fd, int *ret_val)
      */
 	if (!is_valid_fd(old_fd) || !is_valid_fd(new_fd))
 	{
-		*ret_val = -1;
-		return EBADF;
+		spinlock_release(&curproc->p_spinlock);
+		*err = EBADF;
+		return -1;
 	}
-
-	//TODO return EMFILE if the process file table was full, or a process-specific limit on open files was reached
 
 	/**
      * Old file descriptor equal to the new one.
-     * There's no operation to be done, but
-     * ret_val's content is set to 0xFF so that
-     * it's possible to know that old_fd and new_fd
-     * are the same.
-     * Actually useless.
-     * Probably it will be removed.
+     * There's no operation to be done.
      */
 	if (old_fd == new_fd)
 	{
-		*ret_val = 0xFF;
-		//*ret_val = new_fd;
-
-		/*from linux man page: if oldf == newf then dup2 returns newf*/
+		spinlock_release(&curproc->p_spinlock);
 		return 0;
 	}
 
-	/* Check whether new_fd is previously opened and eventually close it */
-	if (systemFileTable[new_fd].vn != NULL)
+	/**
+	 * Allocation of a new openfile.
+	 * 
+	 * This will host the "new file descriptor" openfile.
+	 */ 
+	curproc->fileTable[new_fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
+	if (curproc->fileTable[new_fd] == NULL)
 	{
-		sys_close(new_fd, ret_val);
+		spinlock_release(&curproc->p_spinlock);
+		*err = ENOMEM;
+		return -1;
 	}
 
-	// /* Open the new_fd descriptor */
-	// if (sys_open(new_fd) == -1)
-	// {
-	//     *ret_val = -1;
-	//     return EBADF;
-	// }
+	/**
+	 * Let's now copy all the fields of the fileTable data structure
+	 * from the old_fd entry to the new_fd entry.
+	 */ 
+	curproc->fileTable[new_fd]->vn = curproc->fileTable[old_fd]->vn;
+	curproc->fileTable[new_fd]->mode = curproc->fileTable[old_fd]->mode;
+	curproc->fileTable[new_fd]->offset = curproc->fileTable[old_fd]->offset;
+	curproc->fileTable[new_fd]->accmode = curproc->fileTable[old_fd]->accmode;
+	curproc->fileTable[new_fd]->file_lock = curproc->fileTable[old_fd]->file_lock;
+	curproc->fileTable[new_fd]->ref_count = curproc->fileTable[old_fd]->ref_count;
+	
+	/* If ref_count is greater than zero, this means that this entry of the fileTable is still referenced. */
+	curproc->fileTable[old_fd]->ref_count++;
 
-	/* Let the entry related to new_fd point to the old_fd's one */
-	of = systemFileTable[old_fd];
-	systemFileTable[new_fd].vn = of.vn;
-	systemFileTable[new_fd].mode = of.mode;
-	systemFileTable[new_fd].offset = of.offset;
-	systemFileTable[new_fd].ref_count = of.ref_count;
+	/* Check whether new_fd is previously opened and eventually close it */
+	if (curproc->fileTable[old_fd] != NULL && old_fd != STDIN_FILENO &&
+		old_fd != STDOUT_FILENO && old_fd != STDERR_FILENO)
+	{
+		spinlock_release(&curproc->p_spinlock);
+		if (sys_close(old_fd, err))
+		{
+			*err = EINTR;
+			return -1;
+		}
+		spinlock_acquire(&curproc->p_spinlock);
+	}
+
+	spinlock_release(&curproc->p_spinlock);
 
 	return 0;
 }
@@ -594,17 +629,17 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 	/* Checks whether the file descriptor is valid */
 	if (fd < 0 || fd > OPEN_MAX || !is_valid_fd(fd))
 	{
-		*ret_val = -1;
+		*ret_val = EBADF;
 		spinlock_release(&curproc->p_spinlock);
-		return EBADF;
+		return -1;
 	}
 
 	/* Checks whether the whence parameter is valid */
 	if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
 	{
-		*ret_val = -1;
+		*ret_val = EINVAL;
 		spinlock_release(&curproc->p_spinlock);
-		return EINVAL;
+		return -1;
 	}
 
 	/* If the offset is zero, we can exit */
@@ -660,21 +695,4 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 
 	spinlock_release(&curproc->p_spinlock);
 	return actual_offset;
-}
-
-/**
- * Checks whether the file descriptor has been really allocated.
- * 
- * Parameter:
- * - fd: file descriptor to be tested
- * 
- * Return value:
- * - 0, if fd is not valid
- * - whatever else otherwise
- */
-int is_valid_fd(int fd)
-{
-	if (fd < 0 || fd > OPEN_MAX)
-		return 0;
-	return !(curproc->fileTable[fd]->vn == NULL);
 }
