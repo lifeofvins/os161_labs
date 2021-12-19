@@ -54,10 +54,7 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 
-
- 
-int
-runprogram(char *progname, unsigned long argc, char **args)
+int runprogram(char *progname, unsigned long argc, char **args)
 {
 	struct addrspace *as;
 	struct vnode *v;
@@ -68,12 +65,15 @@ runprogram(char *progname, unsigned long argc, char **args)
 	size_t len;
 	size_t stack_offset = 0;
 	char **argvptr;
-	vaddr_t uprogname[1];
 
+	if (argc > ARG_MAX) {
+		return E2BIG; 
+	}
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
-	if (result) {
+	if (result)
+	{
 		return result;
 	}
 
@@ -82,7 +82,8 @@ runprogram(char *progname, unsigned long argc, char **args)
 
 	/* Create a new address space. */
 	as = as_create();
-	if (as == NULL) {
+	if (as == NULL)
+	{
 		vfs_close(v);
 		return ENOMEM;
 	}
@@ -93,7 +94,8 @@ runprogram(char *progname, unsigned long argc, char **args)
 
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
-	if (result) {
+	if (result)
+	{
 		/* p_addrspace will go away when curproc is destroyed */
 		vfs_close(v);
 		return result;
@@ -104,65 +106,52 @@ runprogram(char *progname, unsigned long argc, char **args)
 
 	/* Define the user stack in the address space */
 	result = as_define_stack(as, &stackptr);
-	if (result) {
+	if (result)
+	{
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
 
-	if (args != NULL) {
-		/*program has arguments*/
-		argvptr = (char **)kmalloc(argc*sizeof(char **));
-		if (argvptr == NULL) {
+	/*program has arguments*/
+	argvptr = (char **)kmalloc(argc * sizeof(char **));
+	if (argvptr == NULL)
+	{
+		return ENOMEM;
+	}
+	/*last item points to NULL*/
+	argvptr[argc] = NULL;
+
+	for (i = 0; i < (int)argc; i++)
+	{
+		/*allocation*/
+		len = strlen(args[i]) + 1;
+		argvptr[i] = (char *)kmalloc(sizeof(char *));
+		if (argvptr[i] == NULL)
+		{
 			return ENOMEM;
 		}
-		/*last item points to NULL*/
-		argvptr[argc] = NULL;
-
-		for (i = 0; i < (int)argc; i++) {
-			/*allocation*/
-			len = strlen(args[i])+1;
-			argvptr[i] = (char *)kmalloc(sizeof(char *));
-			if (argvptr[i] == NULL) {
-				return ENOMEM;
-			}
-			stackptr -= len;
-			if (stackptr & 0x3) {
-				stackptr -= stackptr & 0x3;
-			}
-
-			/*copy from kernel buffer to user space*/
-			copyoutstr(args[i], (userptr_t)stackptr, len, NULL);
-			argvptr[i] = (char *)stackptr; /*save current position in the stack of the argument*/
+		stackptr -= len;
+		if (stackptr & 0x3)
+		{
+			stackptr -= stackptr & 0x3;
 		}
-		argvptr[argc] = 0;
-		stack_offset += sizeof(char *)*(argc+1);
-		stackptr -= stack_offset;
-		result = copyout(argvptr, (userptr_t)stackptr, sizeof(char *)*(argc));
-		if (result) {
-			return result;
-		}
-		/* Warp to user mode. */
-		enter_new_process(argc, (userptr_t)stackptr /*userspace addr of argv*/,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
 
+		/*copy from kernel buffer to user space*/
+		copyoutstr(args[i], (userptr_t)stackptr, len, NULL);
+		argvptr[i] = (char *)stackptr; /*save current position in the stack of the argument*/
 	}
-	else {
-		/*we have just the progname*/
-		len = strlen(progname)+1;
-		uprogname[0] = stackptr - len;
-		copyoutstr(progname, (userptr_t)uprogname[0], len, NULL);
-
-		len += sizeof(vaddr_t);
-		stackptr = stackptr -len - ((stackptr - len)%8);
-		copyout(uprogname, (userptr_t)stackptr, sizeof(vaddr_t));
-		/* Warp to user mode. */
-		enter_new_process(1, (userptr_t)stackptr,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
-
+	argvptr[argc] = 0;
+	stack_offset += sizeof(char *) * (argc + 1);
+	stackptr -= stack_offset;
+	result = copyout(argvptr, (userptr_t)stackptr, sizeof(char *) * (argc));
+	if (result)
+	{
+		return result;
 	}
-
+	/* Warp to user mode. */
+	enter_new_process(argc, (userptr_t)stackptr /*userspace addr of argv*/,
+					  NULL /*userspace addr of environment*/,
+					  stackptr, entrypoint);
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
