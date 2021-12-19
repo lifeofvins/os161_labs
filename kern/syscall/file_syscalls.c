@@ -621,7 +621,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 
 	spinlock_acquire(&curproc->p_spinlock);
 	/* Checks whether the file descriptor is valid */
-	if (fd < 0 || fd > OPEN_MAX || !is_valid_fd(fd))
+	if (!is_valid_fd(fd))
 	{
 		*err = EBADF;
 		spinlock_release(&curproc->p_spinlock);

@@ -140,7 +140,7 @@ int runprogram(char *progname, unsigned long argc, char **args)
 		copyoutstr(args[i], (userptr_t)stackptr, len, NULL);
 		argvptr[i] = (char *)stackptr; /*save current position in the stack of the argument*/
 	}
-	argvptr[argc] = 0;
+	argvptr[argc] = NULL;
 	stack_offset += sizeof(char *) * (argc + 1);
 	stackptr -= stack_offset;
 	result = copyout(argvptr, (userptr_t)stackptr, sizeof(char *) * (argc));
