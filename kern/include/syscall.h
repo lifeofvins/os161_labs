@@ -61,30 +61,50 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
  * Prototypes for IN-KERNEL entry points for system call implementations.
  */
 
+struct openfile;
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
-
-struct openfile;
 void openfileIncrRefCount(struct openfile *of);
-int sys_open(userptr_t path, int openflags, mode_t mode, int *err);
-int sys_close(int fd, int *err);
-int sys_dup2(int old_fd, int new_fd, int *ret_val);
 
-/*sdp project*/
+/**
+ * curdir_syscalls.c
+ */
 int sys___getcwd(userptr_t buf, size_t size, int *ret_val);
 int sys_chdir(userptr_t path, int *return_value);
-int sys_dup2(int old_fd, int new_fd, int *ret_val);
-off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val);
 
+/**
+ * file_syscalls.c
+ */
+int sys_open(userptr_t path, int openflags, mode_t mode, int *err);
+int sys_close(int fd, int *err);
 int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err);
 int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err);
-void sys__exit(int status);
-int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err);
-pid_t sys_getpid(void);
+int sys_dup2(int old_fd, int new_fd, int *err);
+off_t sys_lseek(int fd, off_t offset, int whence, int *err);
 
+/**
+ * fork.c
+ */
 int sys_fork(struct trapframe *ctf, pid_t *retval);
 
+/**
+ * execv.c
+ */
 int sys_execv(char *program, char ** args);
 
+/**
+ * getpid.c
+ */
+pid_t sys_getpid(void);
+
+/**
+ * exit.c
+ */
+void sys__exit(int status);
+
+/**
+ * waitpid.c
+ */
+int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err);
 
 #endif /* _SYSCALL_H_ */
