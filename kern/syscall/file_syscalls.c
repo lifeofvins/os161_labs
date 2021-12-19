@@ -521,12 +521,6 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
  * - err: integer pointer set to new_fd if it's all
  *            gone ok, -1 otherwise.
  * 
- * Example of usage:
- *      int logfd = open("logfile", O_WRONLY);
- *      dup2(logfd, STDOUT_FILENO); 
- *      printf("Hello, OS161.\n");
- * 
- * 
  * Return value:
  * 0: on success
  * -1: on failure 
@@ -612,13 +606,13 @@ sys_dup2(int old_fd, int new_fd, int *err)
  * - fd: the file descriptor
  * - offset: an integer representing the offset
  * - whence: it can be SEEK_CUR, SEEK_SET or SEEK_END
- * - ret_val: pointer to the value returned to syscall.c switch-case call
+ * - err: pointer to the value returned to syscall.c switch-case call
  * 
  * Return value:
  * - 0, on success
- * - error code, otherwise
+ * - -1, otherwise
  */
-off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
+off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 {
 	off_t actual_offset = 0;
 	off_t dis;
@@ -629,7 +623,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 	/* Checks whether the file descriptor is valid */
 	if (fd < 0 || fd > OPEN_MAX || !is_valid_fd(fd))
 	{
-		*ret_val = EBADF;
+		*err = EBADF;
 		spinlock_release(&curproc->p_spinlock);
 		return -1;
 	}
@@ -637,7 +631,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 	/* Checks whether the whence parameter is valid */
 	if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
 	{
-		*ret_val = EINVAL;
+		*err = EINVAL;
 		spinlock_release(&curproc->p_spinlock);
 		return -1;
 	}
@@ -645,7 +639,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 	/* If the offset is zero, we can exit */
 	if (offset == 0)
 	{
-		*ret_val = 0;
+		*err = 0;
 		spinlock_release(&curproc->p_spinlock);
 		return 0;
 	}
@@ -694,5 +688,8 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *ret_val)
 	of->offset = actual_offset;
 
 	spinlock_release(&curproc->p_spinlock);
+	
+	// Just to be sure...
+	*err = 0;
 	return actual_offset;
 }

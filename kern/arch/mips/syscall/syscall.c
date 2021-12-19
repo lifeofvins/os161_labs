@@ -79,10 +79,6 @@
  */
 void syscall(struct trapframe *tf)
 {
-<<<<<<< HEAD
-
-=======
->>>>>>> b298c1dcab5c721e63f8d5efddec1f779be12a82
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
 	KASSERT(curthread->t_iplhigh_count == 0);
@@ -119,11 +115,13 @@ void syscall(struct trapframe *tf)
 	case SYS_open:
 		retval = sys_open((userptr_t)tf->tf_a0,
 						  (int)tf->tf_a1,
-						  (mode_t)tf->tf_a2, &err);
+						  (mode_t)tf->tf_a2,
+						  (int *)&err);
 		break;
 
 	case SYS_close:
-		retval = sys_close((int)tf->tf_a0, (int *)&err);
+		retval = sys_close((int)tf->tf_a0,
+						   (int *)&err);
 		break;
 
 	case SYS_remove:
@@ -167,13 +165,9 @@ void syscall(struct trapframe *tf)
 	case SYS_write:
 		retval = sys_write((int)tf->tf_a0,
 						   (userptr_t)tf->tf_a1,
-<<<<<<< HEAD
-						   (size_t)tf->tf_a2, 
-						   (int*)&err);
+						   (size_t)tf->tf_a2,
+						   (int *)&err);
 		/* error: function not implemented */
-=======
-						   (size_t)tf->tf_a2, &err);
->>>>>>> b298c1dcab5c721e63f8d5efddec1f779be12a82
 		if (retval < 0)
 			err = ENOSYS;
 		else
@@ -183,8 +177,8 @@ void syscall(struct trapframe *tf)
 	case SYS_read:
 		retval = sys_read((int)tf->tf_a0,
 						  (userptr_t)tf->tf_a1,
-						  (size_t)tf->tf_a2, 
-						  (int*)&err);
+						  (size_t)tf->tf_a2,
+						  (int *)&err);
 		if (retval < 0)
 			err = ENOSYS;
 		else
