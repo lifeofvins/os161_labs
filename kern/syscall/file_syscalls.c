@@ -615,16 +615,15 @@ sys_dup2(int old_fd, int new_fd, int *err)
 off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 {
 	off_t actual_offset = 0;
-	off_t dis;
 	struct openfile *of;
 	struct stat stat;
 
-	spinlock_acquire(&curproc->p_spinlock);
+	lock_acquire(curproc->fileTable[fd]->file_lock);
 	/* Checks whether the file descriptor is valid */
 	if (!is_valid_fd(fd))
 	{
 		*err = EBADF;
-		spinlock_release(&curproc->p_spinlock);
+		lock_release(curproc->fileTable[fd]->file_lock);
 		return -1;
 	}
 
@@ -632,7 +631,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 	if (whence != SEEK_CUR && whence != SEEK_SET && whence != SEEK_END)
 	{
 		*err = EINVAL;
-		spinlock_release(&curproc->p_spinlock);
+		lock_release(curproc->fileTable[fd]->file_lock);
 		return -1;
 	}
 
@@ -640,7 +639,7 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 	if (offset == 0)
 	{
 		*err = 0;
-		spinlock_release(&curproc->p_spinlock);
+		lock_release(curproc->fileTable[fd]->file_lock);
 		return 0;
 	}
 
@@ -681,14 +680,13 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 	else if (whence == SEEK_END)
 	{
 		VOP_STAT(of->vn, &stat);
-		dis = stat.st_size;
-		actual_offset = dis + offset;
+		actual_offset = stat.st_size + offset;
 	}
 
 	of->offset = actual_offset;
 
-	spinlock_release(&curproc->p_spinlock);
-	
+	lock_release(curproc->fileTable[fd]->file_lock);
+
 	// Just to be sure...
 	*err = 0;
 	return actual_offset;
