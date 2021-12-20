@@ -81,6 +81,8 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err);
 int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err);
 int sys_dup2(int old_fd, int new_fd, int *err);
 off_t sys_lseek(int fd, off_t offset, int whence, int *err);
+int sys_fstat(int fd, userptr_t buf, int *err);
+int sys_mkdir(userptr_t pathname, mode_t mode, int *err);
 
 /**
  * fork.c
