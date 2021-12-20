@@ -53,7 +53,7 @@ int sys___getcwd(userptr_t buf, size_t size, int *err)
     struct vnode *cwd_vn = curproc->p_cwd;
     if (cwd_vn == 0x00)
     {
-        *err = ENOENT;
+        *err = ENOTDIR;
         return -1;
     }
 
