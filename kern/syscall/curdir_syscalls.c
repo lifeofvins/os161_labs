@@ -88,42 +88,42 @@ int sys___getcwd(userptr_t buf, size_t size, int *err)
  * - 0, if success
  * - -1, otherwise
  */
-int sys_chdir(userptr_t path, int *return_value)
+int sys_chdir(userptr_t path, int *err)
 {
     KASSERT(path != 0x00);
 
-    int vfs_return_value;
+    int vfs_err;
     char *kpath = NULL;
 
     /* Check whether the new dir path is valid or not */
     if (dir_parser((const char *)path))
     {
-        *return_value = ENOTDIR;
+        *err = ENOTDIR;
         return -1;
     }
 
-    kpath = (char*) kmalloc(__PATH_MAX);
+    kpath = (char *)kmalloc(__PATH_MAX);
 
-    if(kpath == 0x00)
+    if (kpath == 0x00)
     {
         // bad allocation
-        *return_value = EFAULT;
+        *err = EFAULT;
         return -1;
     }
 
-    if(copyinstr(path, kpath, __PATH_MAX, NULL))
+    if (copyinstr(path, kpath, __PATH_MAX, NULL))
     {
         kfree(kpath);
-        *return_value = EFAULT;
+        *err = EFAULT;
         return -1;
     }
 
-    vfs_return_value = vfs_chdir(kpath);
+    vfs_err = vfs_chdir(kpath);
 
-    if (vfs_return_value)
+    if (vfs_err)
     {
-        *return_value = ENOTDIR;
-        return vfs_return_value;
+        *err = ENOTDIR;
+        return vfs_err;
     }
 
     return 0;
