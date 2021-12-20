@@ -53,8 +53,7 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 	volatile int offset;
 	*buflen = 0;
 
-	i = 0;
-	while (args[i] != NULL)
+	for (i = 0; i < argc - 1; i++)
 	{
 		err = copyinstr((userptr_t)args[i], karg, sizeof(karg), NULL);
 		if (err)
@@ -73,7 +72,6 @@ copy_args_to_kbuf(char **args, int argc, int *buflen)
 
 		last_offset = offset;
 
-		i++;
 		*buflen += padding + sizeof(char *); /*how much will the stackptr have to shift for every arg*/
 	}
 
