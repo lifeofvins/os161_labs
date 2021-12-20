@@ -510,6 +510,127 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 }
 
 /**
+ * Implementation of the fstat system call.
+ * 
+ * This system call has been implemented for
+ * providing a way to mount a different filesystem with
+ * a procedure described in the report and learnt
+ * on the OS161 official website.
+ * This operation wanted to be a way to test the
+ * sys___getcwd system call, even if eventually
+ * the latter has been only userful for retrieving the
+ * path of the root folder.
+ * 
+ * Parameters:
+ * - fd: file descriptor of the System/161 disk image
+ * - buf: user-space pointer where to store the information
+ * 			retrieved by the fstat
+ * - err: pointer to the value returned to syscall.c switch-case call
+ * 
+ * Return value:
+ * 0: on success
+ * -1: on failure 
+ */
+int sys_fstat(int fd, userptr_t buf, int *err)
+{
+	KASSERT(buf != NULL);
+
+	struct openfile *of = curproc->fileTable[fd];
+	struct stat st;
+	int co_res;
+	int vopstat_res;
+
+	/* Check over the validity of the file descriptor */
+	if (!is_valid_fd(fd))
+	{
+		*err = EBADF;
+		return -1;
+	}
+
+	/**
+	 * This macro provides us the needing informations
+	 * storing them into the st variable
+	 */
+	vopstat_res = VOP_STAT(of->vn, &st);
+	if (vopstat_res)
+	{
+		*err = vopstat_res;
+		return -1;
+	}
+
+	/**
+	 * It's now necessary to copy the informations from
+	 * the st variable (which is located inside the kernel
+	 * address space) to the buf variable (user address space).
+	 */
+	co_res = copyout(&st, buf, sizeof(st));
+	if (co_res)
+	{
+		*err = co_res;
+		return -1;
+	}
+
+	*err = 0;
+	return 0;
+}
+
+/**
+ * Implementation of the mkdir system call.
+ * 
+ * This has been implemented for providing a support for
+ * testing the sys___getcwd system call.
+ * 
+ * Parameters:
+ * - pathname: contains the pathname of the new directory to be created
+ * - mode: octal representation for permissions
+ * - err: pointer to the value returned to syscall.c switch-case call
+ * 
+ * Return value:
+ * 0: on success
+ * -1: on failure 
+ */
+int sys_mkdir(userptr_t pathname, mode_t mode, int *err)
+{
+	KASSERT(pathname != NULL);
+
+	int cinstr_returnvalue;
+	int result;
+	size_t rdata;
+	/**
+	 * PATH_MAX since we don't know what is the pathname size.
+	 * The latter will be eventually retrieved by the copyinstr function
+	 * and stored into rdata.
+	 */
+	char kbuf_pathname[PATH_MAX]; 
+
+	/**
+	 * The pathname variable (user address space) passed as
+	 * parameter has to be copied into the kbuf_pathname (kernel address space)
+	 * before calling the vfs_mkdir function.
+	 */
+	cinstr_returnvalue = copyinstr(pathname, kbuf_pathname, sizeof(kbuf_pathname), &rdata);
+	if (cinstr_returnvalue)
+	{
+		*err = cinstr_returnvalue;
+		return -1;
+	}
+
+	/**
+	 * This will do the most of the work, creating a directory with
+	 * the given pathname and permissions mode.
+	 */
+	result = vfs_mkdir(kbuf_pathname, mode);
+	if (result)
+	{
+		*err = result;
+		return -1;
+	}
+
+	*err = 0;
+	return 0;
+}
+
+/**
  * Implementation of the dup2 system call.
  * 
  * It manages the cases in which bad file descriptors
@@ -518,15 +639,13 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
  * Parameters:
  * - old_fd: the old file descriptor
  * - new_fd: the new file descriptor
- * - err: integer pointer set to new_fd if it's all
- *            gone ok, -1 otherwise.
+ * - err: pointer to the value returned to syscall.c switch-case call
  * 
  * Return value:
  * 0: on success
  * -1: on failure 
  */
-int 
-sys_dup2(int old_fd, int new_fd, int *err)
+int sys_dup2(int old_fd, int new_fd, int *err)
 {
 	spinlock_acquire(&curproc->p_spinlock);
 
@@ -558,7 +677,7 @@ sys_dup2(int old_fd, int new_fd, int *err)
 	 * Allocation of a new openfile.
 	 * 
 	 * This will host the "new file descriptor" openfile.
-	 */ 
+	 */
 	curproc->fileTable[new_fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
 	if (curproc->fileTable[new_fd] == NULL)
 	{
@@ -570,14 +689,14 @@ sys_dup2(int old_fd, int new_fd, int *err)
 	/**
 	 * Let's now copy all the fields of the fileTable data structure
 	 * from the old_fd entry to the new_fd entry.
-	 */ 
+	 */
 	curproc->fileTable[new_fd]->vn = curproc->fileTable[old_fd]->vn;
 	curproc->fileTable[new_fd]->mode = curproc->fileTable[old_fd]->mode;
 	curproc->fileTable[new_fd]->offset = curproc->fileTable[old_fd]->offset;
 	curproc->fileTable[new_fd]->accmode = curproc->fileTable[old_fd]->accmode;
 	curproc->fileTable[new_fd]->file_lock = curproc->fileTable[old_fd]->file_lock;
 	curproc->fileTable[new_fd]->ref_count = curproc->fileTable[old_fd]->ref_count;
-	
+
 	/* If ref_count is greater than zero, this means that this entry of the fileTable is still referenced. */
 	curproc->fileTable[old_fd]->ref_count++;
 
@@ -596,6 +715,7 @@ sys_dup2(int old_fd, int new_fd, int *err)
 
 	spinlock_release(&curproc->p_spinlock);
 
+	*err = 0;
 	return 0;
 }
 
@@ -687,7 +807,6 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 
 	lock_release(curproc->fileTable[fd]->file_lock);
 
-	// Just to be sure...
 	*err = 0;
 	return actual_offset;
 }
