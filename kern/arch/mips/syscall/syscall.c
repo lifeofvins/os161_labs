@@ -157,7 +157,7 @@ void syscall(struct trapframe *tf)
 			retval = sys_lseek(
 				(int)tf->tf_a0,
 				(off_t)offset_lseek,
-				(int)tf->tf_a2,
+				(int)whence,
 				(int *)&err);
 		}
 		break;
