@@ -134,6 +134,21 @@ void syscall(struct trapframe *tf)
 			(userptr_t)tf->tf_a0,
 			(int *)&err);
 		break;
+			
+	case SYS_fstat:
+		retval = sys_fstat(
+			(int)tf->tf_a0,
+			(userptr_t)tf->tf_a1,
+			(int *)&err);
+		break;
+
+	case SYS_mkdir:
+		retval = sys_mkdir(
+			(userptr_t)tf->tf_a0,
+			(mode_t)tf->tf_a1,
+			(int*)&err
+		);
+		break;
 
 	case SYS___getcwd:
 		retval = sys___getcwd(
