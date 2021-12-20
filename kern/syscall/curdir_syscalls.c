@@ -53,8 +53,8 @@ int sys___getcwd(userptr_t buf, size_t size, int *err)
     struct vnode *cwd_vn = curproc->p_cwd;
     if (cwd_vn == 0x00)
     {
-        *err = -1;
-        return ENOENT;
+        *err = ENOENT;
+        return -1;
     }
 
     /* Setting the user space without involving the kernel level address space */
@@ -63,8 +63,8 @@ int sys___getcwd(userptr_t buf, size_t size, int *err)
     vfs_err = vfs_getcwd(&uio);
     if (vfs_err != 0)
     {
-        *err = -1;
-        return vfs_err;
+        *err = vfs_err;
+        return -1;
     }
 
     *err = 0;
