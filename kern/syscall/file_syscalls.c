@@ -650,13 +650,13 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	spinlock_acquire(&curproc->p_spinlock);
 
 	/**
-     * Error handling:
-     * File descriptors cannot be negative integer numbers
-     * or integer greater than the value specified in OPEN_MAX constant.
-     * Moreover, there's a function which checks whether the
-     * old_fd is a actually existing inside the process filetable or not.
-     */
-	if (!is_valid_fd(old_fd) || !is_valid_fd(new_fd))
+	* Error handling:
+	* File descriptors cannot be negative integer numbers
+	* or integer greater than the value specified in OPEN_MAX constant.
+	* Moreover, there's a function which checks whether the
+	* old_fd is a actually existing inside the process filetable or not.
+	*/
+	if (!is_valid_fd(old_fd) || new_fd < 0 || new_fd > OPEN_MAX)
 	{
 		spinlock_release(&curproc->p_spinlock);
 		*err = EBADF;
@@ -664,13 +664,26 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	}
 
 	/**
-     * Old file descriptor equal to the new one.
-     * There's no operation to be done.
-     */
+	* Old file descriptor equal to the new one.
+	* There's no operation to be done.
+	*/
 	if (old_fd == new_fd)
 	{
 		spinlock_release(&curproc->p_spinlock);
 		return 0;
+	}
+	
+	/* Check whether new_fd is previously opened and eventually close it */
+	if (curproc->fileTable[new_fd] != NULL && new_fd != STDIN_FILENO &&
+		new_fd != STDOUT_FILENO && new_fd != STDERR_FILENO)
+	{
+		spinlock_release(&curproc->p_spinlock);
+		if (sys_close(new_fd, err))
+		{
+			*err = EINTR;
+			return -1;
+		}
+		spinlock_acquire(&curproc->p_spinlock);
 	}
 
 	/**
@@ -678,12 +691,6 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	 * 
 	 * This will host the "new file descriptor" openfile.
 	 */
-	if(curproc->fileTable[new_fd] != NULL)
-	{
-		kfree(curproc->fileTable[new_fd]->vn);
-		lock_destroy(curproc->fileTable[new_fd]->file_lock);
-		curproc->fileTable[new_fd] = NULL;
-	}
 	curproc->fileTable[new_fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
 	if (curproc->fileTable[new_fd] == NULL)
 	{
@@ -691,6 +698,9 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 		*err = ENOMEM;
 		return -1;
 	}
+
+	/* If ref_count is greater than zero, this means that this entry of the fileTable is still referenced. */
+	curproc->fileTable[old_fd]->ref_count++;
 
 	/**
 	 * Let's now copy all the fields of the fileTable data structure
@@ -702,22 +712,6 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	curproc->fileTable[new_fd]->accmode = curproc->fileTable[old_fd]->accmode;
 	curproc->fileTable[new_fd]->file_lock = curproc->fileTable[old_fd]->file_lock;
 	curproc->fileTable[new_fd]->ref_count = curproc->fileTable[old_fd]->ref_count;
-
-	/* If ref_count is greater than zero, this means that this entry of the fileTable is still referenced. */
-	curproc->fileTable[old_fd]->ref_count++;
-
-	/* Check whether new_fd is previously opened and eventually close it */
-	if (curproc->fileTable[old_fd] != NULL && old_fd != STDIN_FILENO &&
-		old_fd != STDOUT_FILENO && old_fd != STDERR_FILENO)
-	{
-		spinlock_release(&curproc->p_spinlock);
-		if (sys_close(old_fd, err))
-		{
-			*err = EINTR;
-			return -1;
-		}
-		spinlock_acquire(&curproc->p_spinlock);
-	}
 
 	spinlock_release(&curproc->p_spinlock);
 
