@@ -678,6 +678,12 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	 * 
 	 * This will host the "new file descriptor" openfile.
 	 */
+	if(curproc->fileTable[new_fd] != NULL)
+	{
+		kfree(curproc->fileTable[new_fd]->vn);
+		lock_destroy(curproc->fileTable[new_fd]->file_lock);
+		curproc->fileTable[new_fd] = NULL;
+	}
 	curproc->fileTable[new_fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
 	if (curproc->fileTable[new_fd] == NULL)
 	{
