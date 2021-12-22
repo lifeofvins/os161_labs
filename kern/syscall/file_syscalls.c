@@ -446,6 +446,7 @@ int sys_close(int fd, int *err)
 
 	return 0;
 }
+
 /*
  * simple file system calls for write/read
  */
@@ -453,18 +454,19 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err)
 {
 	int i;
 	char *p = (char *)buf_ptr;
-
 	struct proc *cur = curproc;
 	KASSERT(cur != NULL);
 
+	/* Error: we can't write on the stdin */
 	if (fd == STDIN_FILENO)
 	{
 		/*we cannot write on stdin*/
 		*err = EINVAL;
 		return -1;
 	}
-	if (fd == STDOUT_FILENO || fd == STDERR_FILENO)
+	else if (fd == STDOUT_FILENO || fd == STDERR_FILENO)
 	{
+		/* Support for the case in which there has been executed a dup2 involving the stdout or the stderr */
 		if (curproc->fileTable[fd] != NULL)
 		{
 			return file_write(fd, buf_ptr, size, err);
@@ -481,31 +483,36 @@ int sys_write(int fd, userptr_t buf_ptr, size_t size, int *err)
 
 	return (int)size;
 }
+
 int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 {
 	char *p = (char *)buf_ptr;
 	int i;
-	if (fd == STDERR_FILENO)
+
+	/* Error: we can't read from stdout and stderr */
+	if (fd == STDERR_FILENO || fd == STDOUT_FILENO)
 	{
 		*err = EINVAL;
 		return -1;
 	}
-	if (fd != STDIN_FILENO)
+	else if (fd == STDIN_FILENO)
 	{
+		/* Support for the case in which there has been executed a dup2 involving the stdin */
 		if (curproc->fileTable[fd] != NULL)
 		{
 			return file_read(fd, buf_ptr, size, err);
 		}
+		for (i = 0; i < (int)size; i++)
+		{
+			p[i] = getch();
+			if (p[i] < 0)
+				return i;
+		}
+	}
+	else
+	{
 		return file_read(fd, buf_ptr, size, err);
 	}
-
-	for (i = 0; i < (int)size; i++)
-	{
-		p[i] = getch();
-		if (p[i] < 0)
-			return i;
-	}
-
 	return (int)size;
 }
 
