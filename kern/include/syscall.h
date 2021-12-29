@@ -33,6 +33,8 @@
 
 #include <cdefs.h> /* for __DEAD */
 
+#include <opt-shell.h>
+
 /*constants for pointer check in system calls*/
 #define KERNEL_PTR ((void *)0x80000000)
 #define INVALID_PTR ((void *)0x40000000)
@@ -66,12 +68,15 @@ int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 void openfileIncrRefCount(struct openfile *of);
 
+#if OPT_SHELL
 /**
  * curdir_syscalls.c
  */
 int sys___getcwd(userptr_t buf, size_t size, int *ret_val);
 int sys_chdir(userptr_t path, int *return_value);
+#endif
 
+#if OPT_SHELL
 /**
  * file_syscalls.c
  */
@@ -83,30 +88,38 @@ int sys_dup2(int old_fd, int new_fd, int *err);
 off_t sys_lseek(int fd, off_t offset, int whence, int *err);
 int sys_fstat(int fd, userptr_t buf, int *err);
 int sys_mkdir(userptr_t pathname, mode_t mode, int *err);
+#endif
 
+#if OPT_SHELL
 /**
  * fork.c
  */
 int sys_fork(struct trapframe *ctf, pid_t *retval);
+#endif
 
+#if OPT_SHELL
 /**
  * execv.c
  */
 int sys_execv(char *program, char ** args);
+#endif
 
 /**
  * getpid.c
  */
 pid_t sys_getpid(void);
 
+#if OPT_SHELL
 /**
  * exit.c
  */
 void sys__exit(int status);
+#endif
 
+#if OPT_SHELL
 /**
  * waitpid.c
  */
 int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err);
-
+#endif
 #endif /* _SYSCALL_H_ */
