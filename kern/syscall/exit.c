@@ -21,6 +21,10 @@
 #include <test.h>
 #include <kern/wait.h>
 
+#include <opt-shell.h>
+
+#if OPT_SHELL
+
 static int 
 close_all_files(struct proc *p) {
     int i, err;
@@ -61,3 +65,5 @@ void sys__exit(int status)
     panic("thread_exit returned (should not happen)\n");
     (void)status;
 }
+
+#endif

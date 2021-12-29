@@ -449,14 +449,13 @@ optfile net	test/nettest.c
 #                                      #
 ########################################
 
-defoption synch
-optfile synch thread/synch.c
-
-file        syscall/file_syscalls.c 
-file        syscall/exit.c 
-file		syscall/waitpid.c
-file		syscall/getpid.c
-file        syscall/curdir_syscalls.c 
-file        syscall/fork.c
-file        syscall/execv.c
-
+defoption   synch
+defoption   shell
+optfile     synch   thread/synch.c
+optfile     shell       syscall/file_syscalls.c 
+optfile     shell       syscall/exit.c 
+optfile     shell       syscall/waitpid.c
+optfile     shell       syscall/getpid.c
+optfile     shell       syscall/curdir_syscalls.c 
+optfile     shell       syscall/fork.c
+optfile     shell       syscall/execv.c

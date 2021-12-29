@@ -17,6 +17,10 @@
 #include <synch.h>
 #include <array.h>
 
+#include <opt-shell.h>
+
+#if OPT_SHELL
+
 /*
  * Enter user mode for a newly forked process.
  *
@@ -148,4 +152,5 @@ int sys_fork(struct trapframe *ctf, pid_t *retval)
 	*retval = child->p_pid; /*parent returns with child's pid immediately*/
 	return 0;
 }
- 
+
+#endif

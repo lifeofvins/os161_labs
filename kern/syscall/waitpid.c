@@ -16,11 +16,12 @@
 #include <kern/wait.h>
 #include <copyinout.h>
 
+#include <opt-shell.h>
+
+#if OPT_SHELL
+
 int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err)
 {
-
-
-
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL);
     int result;
@@ -119,3 +120,5 @@ int sys_waitpid(pid_t pid, userptr_t statusp, int options, pid_t *err)
     return p->p_pid;
 
 }
+
+#endif

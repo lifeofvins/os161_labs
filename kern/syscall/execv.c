@@ -18,6 +18,10 @@
 #include <vfs.h>
 #include <syscall.h>
 
+#include <opt-shell.h>
+
+#if OPT_SHELL
+
 /*Shared data structures --> we need a lock for them (exec_lock)*/
 static char karg[ARG_MAX];			/*argument string, it's not a string array*/
 static unsigned char kbuf[ARG_MAX]; /*array of bytes*/
@@ -259,3 +263,5 @@ int sys_execv(char *program, char **args)
 	panic("execv: enter_new_process should not return.");
 	return EINVAL;
 }
+
+#endif

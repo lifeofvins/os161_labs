@@ -5,7 +5,6 @@
 #include <syscall.h>
 #include <current.h>
 #include <lib.h>
-
 #include <copyinout.h>
 #include <vnode.h>
 #include <vfs.h>
@@ -16,6 +15,8 @@
 #include <kern/stat.h>
 #include <synch.h>
 #include <kern/fcntl.h>
+
+#include <opt-shell.h>
 
 /*max num of system wide open file*/
 #define SYSTEM_OPEN_MAX 10 * OPEN_MAX
@@ -34,6 +35,8 @@ struct openfile
 
 struct openfile systemFileTable[SYSTEM_OPEN_MAX];
 
+#if OPT_SHELL
+
 /**
  * Checks whether the file descriptor has been really allocated.
  * 
@@ -44,7 +47,7 @@ struct openfile systemFileTable[SYSTEM_OPEN_MAX];
  * - 0, if fd is not valid
  * - whatever else otherwise
  */
-static int 
+static int
 is_valid_fd(int fd)
 {
 	if (fd < 0 || fd > OPEN_MAX)
@@ -53,6 +56,8 @@ is_valid_fd(int fd)
 		return 1;
 	return !(curproc->fileTable[fd] == NULL);
 }
+
+#endif
 
 void openfileIncrRefCount(struct openfile *of)
 {
@@ -95,7 +100,7 @@ static int file_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 	{
 		lock_release(of->file_lock);
 		*err = EBADF;
-		 return -1;
+		return -1;
 	}
 	/*allocation of kernel buffer*/
 	kbuf = kmalloc(size);
@@ -516,6 +521,8 @@ int sys_read(int fd, userptr_t buf_ptr, size_t size, int *err)
 	return (int)size;
 }
 
+#if OPT_SHELL
+
 /**
  * Implementation of the fstat system call.
  * 
@@ -581,6 +588,10 @@ int sys_fstat(int fd, userptr_t buf, int *err)
 	return 0;
 }
 
+#endif
+
+#if OPT_SHELL
+
 /**
  * Implementation of the mkdir system call.
  * 
@@ -608,7 +619,7 @@ int sys_mkdir(userptr_t pathname, mode_t mode, int *err)
 	 * The latter will be eventually retrieved by the copyinstr function
 	 * and stored into rdata.
 	 */
-	char kbuf_pathname[PATH_MAX]; 
+	char kbuf_pathname[PATH_MAX];
 
 	/**
 	 * The pathname variable (user address space) passed as
@@ -636,6 +647,11 @@ int sys_mkdir(userptr_t pathname, mode_t mode, int *err)
 	*err = 0;
 	return 0;
 }
+
+
+#endif
+
+#if OPT_SHELL
 
 /**
  * Implementation of the dup2 system call.
@@ -679,7 +695,7 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 		spinlock_release(&curproc->p_spinlock);
 		return 0;
 	}
-	
+
 	/* Check whether new_fd is previously opened and eventually close it */
 	if (curproc->fileTable[new_fd] != NULL && new_fd != STDIN_FILENO &&
 		new_fd != STDOUT_FILENO && new_fd != STDERR_FILENO)
@@ -725,6 +741,10 @@ int sys_dup2(int old_fd, int new_fd, int *err)
 	*err = 0;
 	return 0;
 }
+
+#endif
+
+#if OPT_SHELL
 
 /**
  * Implementation of the lseek system call.
@@ -817,3 +837,5 @@ off_t sys_lseek(int fd, off_t offset, int whence, int *err)
 	*err = 0;
 	return actual_offset;
 }
+
+#endif

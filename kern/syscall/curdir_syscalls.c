@@ -20,6 +20,10 @@
 #include <copyinout.h>
 #include <proc.h>
 
+#include <opt-shell.h>
+
+#if OPT_SHELL
+
 int dir_parser(const char *);
 void uspace_uio_kinit(struct uio *, struct iovec *, userptr_t, size_t);
 
@@ -188,3 +192,5 @@ void uspace_uio_kinit(struct uio *uio, struct iovec *iovec, userptr_t buf, size_
     uio->uio_segflg = UIO_USERSPACE;
     uio->uio_space = proc_getas();
 }
+
+#endif

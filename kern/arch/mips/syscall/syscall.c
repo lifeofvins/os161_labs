@@ -39,6 +39,8 @@
 
 #include <synch.h>
 
+#include <opt-shell.h>
+
 /*
  * System call dispatcher.
  *
@@ -86,8 +88,11 @@ void syscall(struct trapframe *tf)
 	int callno;
 	int32_t retval;
 	int err = 0;
+
+#if OPT_SHELL
 	int whence;
 	off_t offset_lseek;
+#endif
 
 	callno = tf->tf_v0;
 	/*
@@ -128,41 +133,52 @@ void syscall(struct trapframe *tf)
 		/*just ignore: do nothing*/
 		retval = 0;
 		break;
-
+		
+#if OPT_SHELL
 	case SYS_chdir:
 		retval = sys_chdir(
 			(userptr_t)tf->tf_a0,
 			(int *)&err);
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS_fstat:
 		retval = sys_fstat(
 			(int)tf->tf_a0,
 			(userptr_t)tf->tf_a1,
 			(int *)&err);
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS_mkdir:
 		retval = sys_mkdir(
 			(userptr_t)tf->tf_a0,
 			(mode_t)tf->tf_a1,
 			(int *)&err);
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS___getcwd:
 		retval = sys___getcwd(
 			(userptr_t)tf->tf_a0,
 			(size_t)tf->tf_a1,
 			(int *)&err);
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS_dup2:
 		retval = sys_dup2(
 			(int)tf->tf_a0,
 			(int)tf->tf_a1,
 			(int *)&err);
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS_lseek:
 		offset_lseek = ((off_t)tf->tf_a2 << 32) | tf->tf_a3;
 		err = copyin((userptr_t)(tf->tf_sp + 16), &whence, sizeof(int));
@@ -175,6 +191,7 @@ void syscall(struct trapframe *tf)
 				(int *)&err);
 		}
 		break;
+#endif
 
 	case SYS_write:
 		retval = sys_write((int)tf->tf_a0,
@@ -203,12 +220,14 @@ void syscall(struct trapframe *tf)
 		sys__exit((int)tf->tf_a0);
 		break;
 
+#if OPT_SHELL
 	case SYS_waitpid:
 		sys_waitpid((pid_t)tf->tf_a0,
 					(userptr_t)tf->tf_a1,
 					(int)tf->tf_a2,
 					(pid_t *)&err);
 		break;
+#endif
 
 	case SYS_getpid:
 		retval = sys_getpid();
@@ -218,6 +237,7 @@ void syscall(struct trapframe *tf)
 			err = 0;
 		break;
 
+#if OPT_SHELL
 	case SYS_fork:
 		err = sys_fork(tf, &retval);
 		if (err < 0)
@@ -225,10 +245,13 @@ void syscall(struct trapframe *tf)
 			err = retval;
 		}
 		break;
+#endif
 
+#if OPT_SHELL
 	case SYS_execv:
 		err = sys_execv((char *)tf->tf_a0, (char **)tf->tf_a1);
 		break;
+#endif
 
 	default:
 		kprintf("Unknown syscall %d\n", callno);
