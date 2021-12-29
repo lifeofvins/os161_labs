@@ -122,8 +122,8 @@ int sys_chdir(userptr_t path, int *err)
 
     if (vfs_err)
     {
-        *err = ENOTDIR;
-        return vfs_err;
+        *err = vfs_err;
+        return -1;
     }
 
     return 0;
